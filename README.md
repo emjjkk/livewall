@@ -1,7 +1,32 @@
-# Tauri + React + Typescript
+# emjjkk/livewall
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+![alt text](image.png)
 
-## Recommended IDE Setup
+## Tech Stack
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- Tauri 2
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- tauri-plugin-wallpaper
+
+## Development
+
+```bash
+npm install
+npm run tauri dev
+```
+
+## Build
+
+```bash
+npm run tauri build
+```
+
+## Contributing
+
+Pull requests, feature suggestions, and bug reports are always welcome.
+
+## License
+
+MIT

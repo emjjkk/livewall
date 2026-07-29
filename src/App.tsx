@@ -60,7 +60,7 @@ function WallpaperView({ settings }: { settings: AppSettings }) {
 
   // Focus & battery pausing logic
   useEffect(() => {
-    let batteryInterval: NodeJS.Timeout;
+    let batteryInterval: ReturnType<typeof setInterval>;
 
     const evaluatePauseConditions = async () => {
       let pause = false;
@@ -337,6 +337,10 @@ function SettingsView({
           {settings.wallpaper_type}
         </span>
         <span className="block text-slate-400 truncate">{settings.wallpaper_src}</span>
+      </div>
+
+      <div className="pt-1 text-xs">
+        <p>Built <a href="https://github.com/emjjkk/livewall" className='text-blue-300'>open-source</a> with Tauri + React by <a href="https://emjjkk.tech" className='text-blue-200'>@emjjkk</a></p>
       </div>
     </div>
   );
