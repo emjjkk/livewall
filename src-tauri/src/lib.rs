@@ -7,6 +7,7 @@ use tauri::{
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_store::StoreExt;
 use tauri_plugin_wallpaper::{AttachRequest, PinRequest, WallpaperExt};
+use tauri_plugin_dialog::init as dialog_init;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppSettings {
@@ -38,7 +39,19 @@ impl Default for AppSettings {
 fn get_settings(app: AppHandle) -> AppSettings {
     let store = app.store("settings.json").unwrap();
     if let Some(val) = store.get("config") {
-        if let Ok(settings) = serde_json::from_value::<AppSettings>(val) {
+        if let Ok(mut settings) = serde_json::from_value::<AppSettings>(val) {
+            // Self-heal old/broken configs: `blob:` URLs only ever live inside the
+            // browser session that created them, so one saved to disk can never be
+            // valid again once the app restarts (e.g. after a PC reboot). Without
+            // this, a wallpaper set from an uploaded file would silently fail to
+            // load forever, even though autostart is working correctly.
+            if settings.wallpaper_src.starts_with("blob:") {
+                let defaults = AppSettings::default();
+                settings.wallpaper_type = defaults.wallpaper_type;
+                settings.wallpaper_src = defaults.wallpaper_src;
+                store.set("config", serde_json::to_value(&settings).unwrap());
+                let _ = store.save();
+            }
             return settings;
         }
     }
@@ -86,9 +99,57 @@ fn check_is_on_battery() -> bool {
     false
 }
 
+
+#[tauri::command]
+fn save_wallpaper_file(
+    app: AppHandle,
+    source_path: String,
+) -> Result<String, String> {
+
+    let base_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("wallpapers");
+
+    std::fs::create_dir_all(&base_dir)
+        .map_err(|e| e.to_string())?;
+
+
+    let source = std::path::Path::new(&source_path);
+
+    let filename = source
+        .file_name()
+        .ok_or("Invalid filename")?
+        .to_string_lossy();
+
+
+    let destination = base_dir.join(filename.as_ref());
+
+
+    std::fs::copy(source, &destination)
+        .map_err(|e| e.to_string())?;
+
+
+    Ok(destination.to_string_lossy().to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Chromium/WebView2 throttles timers and can suspend media playback on
+    // windows it considers backgrounded or occluded - which describes our
+    // wallpaper window perfectly, since it always sits behind the desktop
+    // icons and is frequently covered by other apps. Left unchecked, this is
+    // why video wallpapers appear to "stop playing after some time". These
+    // flags tell WebView2 not to apply that throttling.
+    #[cfg(target_os = "windows")]
+    std::env::set_var(
+        "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+        "--disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding",
+    );
+
     tauri::Builder::default()
+        .plugin(dialog_init())
         .plugin(tauri_plugin_wallpaper::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_autostart::init(
@@ -98,7 +159,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_settings,
             update_settings,
-            check_is_on_battery
+            check_is_on_battery,
+            save_wallpaper_file
         ])
         .setup(|app| {
             let handle = app.handle();
@@ -106,6 +168,19 @@ pub fn run() {
             // Attach main window to desktop wallpaper layer (behind icons)
             let _ = handle.wallpaper().attach(AttachRequest::new("main"));
             let _ = handle.wallpaper().pin(PinRequest::new("main"));
+
+            // Windows periodically recreates the desktop's WorkerW layer - e.g.
+            // after waking from sleep, changing resolution/DPI, or explorer.exe
+            // restarting - which detaches our window from behind the desktop
+            // icons and makes the wallpaper appear to freeze or vanish. Re-attach
+            // and re-pin on an interval so it keeps recovering on its own instead
+            // of staying broken until the app is manually restarted.
+            let watchdog_handle = handle.clone();
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(30));
+                let _ = watchdog_handle.wallpaper().attach(AttachRequest::new("main"));
+                let _ = watchdog_handle.wallpaper().pin(PinRequest::new("main"));
+            });
 
             // Create System Tray Menu
             let settings_item =

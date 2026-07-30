@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "livewall",
+  "productName": "Livewall",
   "version": "0.1.0",
   "identifier": "com.os.livewall",
   "build": {
@@ -30,9 +30,13 @@
         "skipTaskbar": false
       }
     ],
-    
+
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/wallpapers/**"]
+      }
     }
   },
   "bundle": {

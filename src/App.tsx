@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { useState, useEffect, useRef } from 'react';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { open } from '@tauri-apps/plugin-dialog';
 import './globals.css';
 
 export interface AppSettings {
@@ -108,11 +109,41 @@ function WallpaperView({ settings }: { settings: AppSettings }) {
       if (isPaused) {
         videoRef.current.pause();
       } else {
-        videoRef.current.play().catch(() => {});
+        videoRef.current.play().catch(() => { });
       }
       videoRef.current.volume = settings.is_muted ? 0 : settings.volume;
     }
   }, [isPaused, settings.volume, settings.is_muted, settings.wallpaper_src]);
+
+  // Playback watchdog: WebView2/Chromium can pause or stall media on windows it
+  // considers backgrounded/occluded (which our wallpaper window always is, since
+  // it sits behind the desktop icons). This resumes playback whenever the video
+  // stops on its own without us having asked it to (isPaused is false).
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || settings.wallpaper_type !== 'video') return;
+
+    const resumeIfNeeded = () => {
+      if (!isPaused && video.paused) {
+        video.play().catch(() => { });
+      }
+    };
+
+    video.addEventListener('pause', resumeIfNeeded);
+    video.addEventListener('suspend', resumeIfNeeded);
+    video.addEventListener('stalled', resumeIfNeeded);
+    document.addEventListener('visibilitychange', resumeIfNeeded);
+
+    const watchdog = setInterval(resumeIfNeeded, 4000);
+
+    return () => {
+      video.removeEventListener('pause', resumeIfNeeded);
+      video.removeEventListener('suspend', resumeIfNeeded);
+      video.removeEventListener('stalled', resumeIfNeeded);
+      document.removeEventListener('visibilitychange', resumeIfNeeded);
+      clearInterval(watchdog);
+    };
+  }, [isPaused, settings.wallpaper_type]);
 
   // Webpage postMessage sync for audio
   useEffect(() => {
@@ -135,9 +166,8 @@ function WallpaperView({ settings }: { settings: AppSettings }) {
           ref={iframeRef}
           src={settings.wallpaper_src}
           title="Wallpaper Webpage"
-          className={`w-full h-full border-0 transition-opacity duration-300 ${
-            isPaused ? 'opacity-30' : 'opacity-100'
-          }`}
+          className={`w-full h-full border-0 transition-opacity duration-300 ${isPaused ? 'opacity-30' : 'opacity-100'
+            }`}
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
         />
       ) : settings.wallpaper_type === 'video' ? (
@@ -148,9 +178,8 @@ function WallpaperView({ settings }: { settings: AppSettings }) {
           loop
           muted={settings.is_muted}
           playsInline
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
-            isPaused ? 'opacity-30' : 'opacity-100'
-          }`}
+          className={`w-full h-full object-cover transition-opacity duration-300 ${isPaused ? 'opacity-30' : 'opacity-100'
+            }`}
         />
       ) : (
         <img
@@ -172,19 +201,70 @@ function SettingsView({
   onUpdate: (cfg: AppSettings) => void;
 }) {
   const [urlInput, setUrlInput] = useState('');
+  const [isSavingFile, setIsSavingFile] = useState(false);
 
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const fileUrl = URL.createObjectURL(file);
-    const isVideo = file.type.startsWith('video/');
-
-    onUpdate({
-      ...settings,
-      wallpaper_type: isVideo ? 'video' : 'image',
-      wallpaper_src: fileUrl,
+  const handleFileUpload = async () => {
+    const selected = await open({
+      multiple: false,
+      filters: [
+        {
+          name: 'Wallpaper',
+          extensions: [
+            'png',
+            'jpg',
+            'jpeg',
+            'webp',
+            'mp4',
+            'webm',
+            'mov'
+          ]
+        }
+      ]
     });
+
+
+    if (!selected || Array.isArray(selected)) {
+      return;
+    }
+
+
+    setIsSavingFile(true);
+
+    try {
+      const savedPath = await invoke<string>(
+        'save_wallpaper_file',
+        {
+          sourcePath: selected
+        }
+      );
+
+
+      const extension = selected
+        .split('.')
+        .pop()
+        ?.toLowerCase();
+
+
+      const isVideo =
+        ['mp4', 'webm', 'mov'].includes(extension ?? "");
+
+
+      onUpdate({
+        ...settings,
+        wallpaper_type: isVideo ? 'video' : 'image',
+        wallpaper_src: convertFileSrc(savedPath)
+      });
+
+
+    } catch (err) {
+      console.error(
+        "Failed saving wallpaper:",
+        err
+      );
+
+    } finally {
+      setIsSavingFile(false);
+    }
   };
 
   const handleUrlApply = () => {
@@ -231,12 +311,16 @@ function SettingsView({
             <label className="text-xs font-medium text-slate-300">
               Upload Local File (Image / Video)
             </label>
-            <input
-              type="file"
-              accept="image/*,video/*"
-              onChange={handleFileUpload}
-              className="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer"
-            />
+            <button
+              onClick={handleFileUpload}
+              disabled={isSavingFile}
+              className="w-full px-3 py-2 text-xs bg-blue-600 rounded text-white"
+            >
+              {isSavingFile ? "Saving..." : "Choose Wallpaper"}
+            </button>
+            {isSavingFile && (
+              <p className="text-[11px] text-slate-400">Saving file…</p>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -273,11 +357,10 @@ function SettingsView({
               </span>
               <button
                 onClick={() => toggleSetting('is_muted')}
-                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
-                  settings.is_muted
-                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
+                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${settings.is_muted
+                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
               >
                 {settings.is_muted ? 'Muted' : 'Mute'}
               </button>
@@ -365,14 +448,12 @@ function ToggleOption({
       </div>
       <button
         onClick={onChange}
-        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-          checked ? 'bg-blue-600' : 'bg-slate-700'
-        }`}
+        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${checked ? 'bg-blue-600' : 'bg-slate-700'
+          }`}
       >
         <span
-          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-            checked ? 'translate-x-4' : 'translate-x-0'
-          }`}
+          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-4' : 'translate-x-0'
+            }`}
         />
       </button>
     </div>
