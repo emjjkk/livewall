@@ -48,6 +48,7 @@ src/
   assets/
     react.svg
   components/
+    NumberScrubber.tsx
     ToggleOption.tsx
   hooks/
     useSettings.ts
@@ -132,6 +133,7 @@ src-tauri/
   Cargo.toml
   .gitignore
   tauri.conf.json
+biome.json
 .gitignore
 image.png
 index.html
@@ -144,6 +146,160 @@ vite.config.ts
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/components/NumberScrubber.tsx">
+import { useEffect, useRef, useState } from "react";
+
+interface NumberScrubberProps {
+	value: number;
+	min: number;
+	max: number;
+	step?: number;
+	suffix?: string;
+	onChange: (value: number) => void;
+}
+
+export function NumberScrubber({ value, min, max, step = 1, suffix, onChange }: NumberScrubberProps) {
+	const [isDragging, setIsDragging] = useState(false);
+	const dragRef = useRef<{
+		startX: number;
+		startValue: number;
+	} | null>(null);
+
+	useEffect(() => {
+		if (!isDragging) {
+			return;
+		}
+
+		const handlePointerMove = (event: PointerEvent) => {
+			if (!dragRef.current) {
+				return;
+			}
+
+			const delta = event.clientX - dragRef.current.startX;
+
+			// 4 pixels of horizontal movement = one step.
+			const rawValue = dragRef.current.startValue + (delta / 4) * step;
+
+			const steppedValue = Math.round(rawValue / step) * step;
+
+			const clamped = Math.min(Math.max(steppedValue, min), max);
+
+			onChange(clamped);
+		};
+
+		const handlePointerUp = () => {
+			setIsDragging(false);
+			dragRef.current = null;
+			document.body.style.cursor = "";
+			document.body.style.userSelect = "";
+		};
+
+		window.addEventListener("pointermove", handlePointerMove);
+		window.addEventListener("pointerup", handlePointerUp);
+
+		return () => {
+			window.removeEventListener("pointermove", handlePointerMove);
+			window.removeEventListener("pointerup", handlePointerUp);
+		};
+	}, [isDragging, max, min, onChange, step]);
+
+	const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+		if (event.button !== 0) {
+			return;
+		}
+
+		dragRef.current = {
+			startX: event.clientX,
+			startValue: value,
+		};
+
+		setIsDragging(true);
+
+		document.body.style.cursor = "ew-resize";
+		document.body.style.userSelect = "none";
+
+		event.currentTarget.setPointerCapture(event.pointerId);
+	};
+
+	const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+		const parsed = Number(event.target.value);
+
+		if (!Number.isFinite(parsed)) {
+			return;
+		}
+
+		onChange(Math.min(Math.max(parsed, min), max));
+	};
+
+	return (
+		<div
+			className={`flex h-7 min-w-0 items-center rounded-md border transition-colors ${
+				isDragging ? "border-blue-500 bg-blue-500/10" : "border-slate-700 bg-slate-800 hover:border-slate-600"
+			}`}
+		>
+			<div
+				onPointerDown={handlePointerDown}
+				title="Drag horizontally to adjust"
+				className={`flex h-full min-w-0 flex-1 cursor-ew-resize items-center px-2 ${isDragging ? "text-blue-300" : "text-slate-200"}`}
+			>
+				<input
+					type="number"
+					value={value}
+					min={min}
+					max={max}
+					step={step}
+					onChange={handleInputChange}
+					onPointerDown={(event) => {
+						event.stopPropagation();
+					}}
+					className="w-full min-w-0 bg-transparent text-xs font-mono outline-none"
+				/>
+			</div>
+
+			{suffix && <span className="pr-2 text-[10px] text-slate-500">{suffix}</span>}
+		</div>
+	);
+}
+</file>
+
+<file path="biome.json">
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"includes": ["**", "!!**/src-tauri", "!!**/dist"]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 170
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended"
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double"
+		}
+	},
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	}
+}
+</file>
 
 <file path="public/tauri.svg">
 <svg width="206" height="231" viewBox="0 0 206 231" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -164,464 +320,1420 @@ This section contains the contents of the repository's files.
 
 <file path="src/components/ToggleOption.tsx">
 interface ToggleOptionProps {
-  label: string;
-  description: string;
-  checked: boolean;
-  onChange: () => void;
+	label: string;
+	description: string;
+	checked: boolean;
+	onChange: () => void;
 }
 
-export function ToggleOption({
-  label,
-  description,
-  checked,
-  onChange,
-}: ToggleOptionProps) {
-  return (
-    <div className="flex items-center justify-between">
-      <div className="pr-4">
-        <p className="text-xs font-medium text-slate-200">{label}</p>
-        <p className="text-[11px] text-slate-400">{description}</p>
-      </div>
-      <button
-        type="button"
-        onClick={onChange}
-        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-          checked ? 'bg-blue-600' : 'bg-slate-700'
-        }`}
-      >
-        <span
-          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-            checked ? 'translate-x-4' : 'translate-x-0'
-          }`}
-        />
-      </button>
-    </div>
-  );
+export function ToggleOption({ label, description, checked, onChange }: ToggleOptionProps) {
+	return (
+		<div className="flex items-center justify-between">
+			<div className="pr-4">
+				<p className="text-xs font-medium text-slate-200">{label}</p>
+				<p className="text-[11px] text-slate-400">{description}</p>
+			</div>
+			<button
+				type="button"
+				onClick={onChange}
+				className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+					checked ? "bg-blue-600" : "bg-slate-700"
+				}`}
+			>
+				<span
+					className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+						checked ? "translate-x-4" : "translate-x-0"
+					}`}
+				/>
+			</button>
+		</div>
+	);
 }
 </file>
 
 <file path="src/hooks/useSettings.ts">
-import { useState, useEffect, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import type { AppSettings } from '../types/settings';
+import { useState, useEffect, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import type { AppSettings } from "../types/settings";
 
 export function useSettings() {
-  const [settings, setSettings] = useState<AppSettings | null>(null);
+	const [settings, setSettings] = useState<AppSettings | null>(null);
 
-  useEffect(() => {
-    // Fetch initial settings from disk
-    invoke<AppSettings>('get_settings')
-      .then(setSettings)
-      .catch(console.error);
+	useEffect(() => {
+		// Fetch initial settings from disk
+		invoke<AppSettings>("get_settings").then(setSettings).catch(console.error);
 
-    // Keep state in sync between main window & settings window
-    const unlisten = listen<AppSettings>('settings-changed', (event) => {
-      setSettings(event.payload);
-    });
+		// Keep state in sync between main window & settings window
+		const unlisten = listen<AppSettings>("settings-changed", (event) => {
+			setSettings(event.payload);
+		});
 
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, []);
+		return () => {
+			unlisten.then((fn) => fn());
+		};
+	}, []);
 
-  const updateSettings = useCallback(async (newSettings: AppSettings) => {
-    setSettings(newSettings);
-    await invoke('update_settings', { newSettings });
-  }, []);
+	const updateSettings = useCallback(async (newSettings: AppSettings) => {
+		setSettings(newSettings);
+		await invoke("update_settings", { newSettings });
+	}, []);
 
-  return {
-    settings,
-    setSettings,
-    updateSettings,
-  };
+	return {
+		settings,
+		setSettings,
+		updateSettings,
+	};
 }
 </file>
 
 <file path="src/types/settings.ts">
-export type WallpaperType = 'image' | 'video' | 'webpage';
+export type WallpaperType = "image" | "video" | "webpage";
+
+export interface WallpaperOverlay {
+	id: string;
+	url: string;
+
+	// Position as a percentage of the wallpaper window.
+	x: number;
+	y: number;
+
+	// Size in pixels.
+	width: number;
+	height: number;
+}
 
 export interface AppSettings {
-  wallpaper_type: WallpaperType;
-  wallpaper_src: string;
-  autostart: boolean;
-  pause_on_battery: boolean;
-  pause_on_unfocus: boolean;
-  volume: number;
-  is_muted: boolean;
+	wallpaper_type: WallpaperType;
+	wallpaper_src: string;
+
+	autostart: boolean;
+	pause_on_battery: boolean;
+	pause_on_unfocus: boolean;
+
+	volume: number;
+	is_muted: boolean;
+
+	overlays: WallpaperOverlay[];
 }
 </file>
 
 <file path="src/windows/SettingsWindow.tsx">
-import { useState, ChangeEvent } from 'react';
-import { invoke, convertFileSrc } from '@tauri-apps/api/core';
-import type { AppSettings } from '../types/settings';
-import { ToggleOption } from '../components/ToggleOption';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import type { AppSettings, WallpaperOverlay } from "../types/settings";
 
 interface SettingsWindowProps {
-  settings: AppSettings;
-  onUpdate: (cfg: AppSettings) => void;
+	settings: AppSettings;
+	onUpdate: (cfg: AppSettings) => void;
 }
 
+type Tab = "wallpaper" | "widgets";
+
+const inputClass =
+	"w-full border border-neutral-200 bg-white px-2 py-1.5 text-[11px] text-neutral-900 outline-none transition-colors placeholder:text-neutral-400 focus:border-neutral-400 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:focus:border-neutral-600";
+
+const primaryButtonClass =
+	"shrink-0 border border-neutral-900 bg-neutral-900 px-3 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-neutral-700 dark:border-neutral-100 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300";
+
+const subtleButtonClass =
+	"border border-transparent px-2 py-1.5 text-[11px] text-neutral-500 transition-colors hover:border-neutral-200 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-500 dark:hover:border-neutral-800 dark:hover:bg-neutral-950 dark:hover:text-neutral-100";
+
 export function SettingsWindow({ settings, onUpdate }: SettingsWindowProps) {
-  const [urlInput, setUrlInput] = useState('');
-  const [isSavingFile, setIsSavingFile] = useState(false);
+	const [tab, setTab] = useState<Tab>("wallpaper");
+	const [urlInput, setUrlInput] = useState("");
+	const [overlayUrlInput, setOverlayUrlInput] = useState("");
+	const [isSavingFile, setIsSavingFile] = useState(false);
+	const [expandedOverlays, setExpandedOverlays] = useState<Record<string, boolean>>({});
 
-  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+	const toggleSetting = (
+		key: "autostart" | "pause_on_battery" | "pause_on_unfocus" | "is_muted",
+	) => {
+		onUpdate({
+			...settings,
+			[key]: !settings[key],
+		});
+	};
 
-    const isVideo = file.type.startsWith('video/');
+	const updateVolume = (volume: number) => {
+		onUpdate({
+			...settings,
+			volume,
+		});
+	};
 
-    setIsSavingFile(true);
-    try {
-      // Persist the file to disk (instead of a session-only blob: URL) so the
-      // wallpaper still loads after the app restarts, including on autostart.
-      const buffer = await file.arrayBuffer();
-      const savedPath = await invoke<string>('save_wallpaper_file', {
-        fileName: file.name,
-        data: Array.from(new Uint8Array(buffer)),
-      });
+	/*
+	 * IMPORTANT:
+	 *
+	 * Do not use <input type="file"> + file.arrayBuffer() here.
+	 *
+	 * That forces the entire video through the WebView/JS process.
+	 * Instead, use Tauri's native file picker and pass only the
+	 * filesystem path to Rust.
+	 */
+	const handleFileUpload = async () => {
+		if (isSavingFile) {
+			return;
+		}
 
-      onUpdate({
-        ...settings,
-        wallpaper_type: isVideo ? 'video' : 'image',
-        wallpaper_src: convertFileSrc(savedPath),
-      });
-    } catch (err) {
-      console.error('Failed to save wallpaper file:', err);
-    } finally {
-      setIsSavingFile(false);
-      // Allow re-selecting the same file again later
-      e.target.value = '';
-    }
-  };
+		try {
+			const selected = await open({
+				multiple: false,
+				directory: false,
+				title: "Choose wallpaper",
+				filters: [
+					{
+						name: "Images",
+						extensions: [
+							"jpg",
+							"jpeg",
+							"png",
+							"gif",
+							"webp",
+							"bmp",
+							"svg",
+						],
+					},
+					{
+						name: "Videos",
+						extensions: [
+							"mp4",
+							"webm",
+							"ogg",
+							"mov",
+							"m4v",
+							"avi",
+							"mkv",
+						],
+					},
+				],
+			});
 
-  const handleUrlApply = () => {
-    let url = urlInput.trim();
-    if (!url) return;
+			if (!selected || Array.isArray(selected)) {
+				return;
+			}
 
-    if (!/^https?:\/\//i.test(url)) {
-      url = `https://${url}`;
-    }
+			const filePath = selected;
 
-    const isDirectVideo = /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url);
-    const isDirectImage = /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(url);
+			setIsSavingFile(true);
 
-    let wallpaper_type: AppSettings['wallpaper_type'] = 'webpage';
-    if (isDirectVideo) wallpaper_type = 'video';
-    if (isDirectImage) wallpaper_type = 'image';
+			/*
+			 * Only the path crosses IPC.
+			 *
+			 * Rust performs the actual file copy directly from disk.
+			 */
+			const savedPath = await invoke<string>("save_wallpaper_file", {
+				sourcePath: filePath,
+			});
 
-    onUpdate({
-      ...settings,
-      wallpaper_type,
-      wallpaper_src: url,
-    });
+			const extension =
+				filePath
+					.split(/[\\/]/)
+					.pop()
+					?.split(".")
+					.pop()
+					?.toLowerCase() ?? "";
 
-    setUrlInput('');
-  };
+			const videoExtensions = new Set([
+				"mp4",
+				"webm",
+				"ogg",
+				"mov",
+				"m4v",
+				"avi",
+				"mkv",
+			]);
 
-  const toggleSetting = (key: keyof AppSettings) => {
-    onUpdate({
-      ...settings,
-      [key]: !settings[key],
-    });
-  };
+			const isVideo = videoExtensions.has(extension);
 
-  return (
-    <div className="p-5 w-full h-screen bg-slate-900 text-slate-100 flex flex-col justify-between select-none overflow-y-auto">
-      <div className="space-y-6">
-        {/* Source Configuration */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-1.5">
-            Wallpaper Source
-          </h2>
+			onUpdate({
+				...settings,
+				wallpaper_type: isVideo ? "video" : "image",
+				wallpaper_src: convertFileSrc(savedPath),
+			});
+		} catch (err) {
+			console.error("Failed to save wallpaper file:", err);
+		} finally {
+			setIsSavingFile(false);
+		}
+	};
 
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-300">
-              Upload Local File (Image / Video)
-            </label>
-            <input
-              type="file"
-              accept="image/*,video/*"
-              onChange={handleFileUpload}
-              disabled={isSavingFile}
-              className="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer disabled:opacity-50"
-            />
-            {isSavingFile && (
-              <p className="text-[11px] text-slate-400">Saving file…</p>
-            )}
-          </div>
+	const handleUrlApply = () => {
+		let url = urlInput.trim();
 
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-300">
-              Webpage or Media URL
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="url"
-                placeholder="https://example.com"
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                className="flex-1 px-2.5 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded focus:outline-none focus:border-blue-500 text-slate-200"
-              />
-              <button
-                type="button"
-                onClick={handleUrlApply}
-                className="px-3 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-500 rounded text-white transition-colors cursor-pointer"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-        </section>
+		if (!url) {
+			return;
+		}
 
-        {/* Audio Configuration */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-1.5">
-            Audio Settings
-          </h2>
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-medium text-slate-300">
-                Playback Volume
-              </span>
-              <button
-                type="button"
-                onClick={() => toggleSetting('is_muted')}
-                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-                  settings.is_muted
-                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                {settings.is_muted ? 'Muted' : 'Mute'}
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={settings.is_muted ? 0 : settings.volume}
-                disabled={settings.is_muted}
-                onChange={(e) =>
-                  onUpdate({ ...settings, volume: parseFloat(e.target.value) })
-                }
-                className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 disabled:opacity-40"
-              />
-              <span className="text-xs font-mono text-slate-400 w-9 text-right">
-                {settings.is_muted ? '0%' : `${Math.round(settings.volume * 100)}%`}
-              </span>
-            </div>
-          </div>
-        </section>
+		if (!/^https?:\/\//i.test(url)) {
+			url = `https://${url}`;
+		}
 
-        {/* System & Performance Controls */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-1.5">
-            Performance & System
-          </h2>
+		const isDirectVideo = /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(url);
+		const isDirectImage = /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i.test(url);
 
-          <ToggleOption
-            label="Run on System Startup"
-            description="Start live wallpaper automatically when Windows boots."
-            checked={settings.autostart}
-            onChange={() => toggleSetting('autostart')}
-          />
+		let wallpaper_type: AppSettings["wallpaper_type"] = "webpage";
 
-          <ToggleOption
-            label="Pause on Battery Power"
-            description="Freeze animation/video on battery to conserve power."
-            checked={settings.pause_on_battery}
-            onChange={() => toggleSetting('pause_on_battery')}
-          />
+		if (isDirectVideo) {
+			wallpaper_type = "video";
+		} else if (isDirectImage) {
+			wallpaper_type = "image";
+		}
 
-          <ToggleOption
-            label="Pause when Unfocused"
-            description="Pause playback while actively working in other apps."
-            checked={settings.pause_on_unfocus}
-            onChange={() => toggleSetting('pause_on_unfocus')}
-          />
-        </section>
-      </div>
+		onUpdate({
+			...settings,
+			wallpaper_type,
+			wallpaper_src: url,
+		});
 
-      <div className="pt-3 border-t border-slate-800 text-[11px] text-slate-500 truncate">
-        Active Source:{' '}
-        <span className="capitalize text-slate-300 font-medium">
-          {settings.wallpaper_type}
-        </span>
-        <span className="block text-slate-400 truncate">{settings.wallpaper_src}</span>
-      </div>
+		setUrlInput("");
+	};
 
-      <div className="pt-1 text-xs">
-        <p>Built <a href="https://github.com/emjjkk/livewall" className='text-blue-300'>open-source</a> with Tauri + React by <a href="https://emjjkk.tech" className='text-blue-200'>@emjjkk</a></p>
-      </div>
-    </div>
-  );
+	const handleAddOverlay = () => {
+		const url = overlayUrlInput.trim();
+
+		if (!url) {
+			return;
+		}
+
+		const overlay: WallpaperOverlay = {
+			id: crypto.randomUUID(),
+			url,
+			x: 0,
+			y: 0,
+			width: 400,
+			height: 200,
+		};
+
+		onUpdate({
+			...settings,
+			overlays: [...settings.overlays, overlay],
+		});
+
+		setOverlayUrlInput("");
+		setExpandedOverlays((current) => ({
+			...current,
+			[overlay.id]: true,
+		}));
+	};
+
+	const updateOverlay = (
+		id: string,
+		changes: Partial<WallpaperOverlay>,
+	) => {
+		onUpdate({
+			...settings,
+			overlays: settings.overlays.map((overlay) =>
+				overlay.id === id
+					? { ...overlay, ...changes }
+					: overlay,
+			),
+		});
+	};
+
+	const removeOverlay = (id: string) => {
+		onUpdate({
+			...settings,
+			overlays: settings.overlays.filter(
+				(overlay) => overlay.id !== id,
+			),
+		});
+
+		setExpandedOverlays((current) => {
+			const next = { ...current };
+			delete next[id];
+			return next;
+		});
+	};
+
+	const setOverlayPosition = (
+		overlay: WallpaperOverlay,
+		horizontal?: "left" | "center" | "right",
+		vertical?: "top" | "center" | "bottom",
+	) => {
+		const next: Partial<WallpaperOverlay> = {};
+
+		if (horizontal) {
+			next.x =
+				horizontal === "left"
+					? 0
+					: horizontal === "center"
+						? 50
+						: 100;
+		}
+
+		if (vertical) {
+			next.y =
+				vertical === "top"
+					? 0
+					: vertical === "center"
+						? 50
+						: 100;
+		}
+
+		updateOverlay(overlay.id, next);
+	};
+
+	return (
+		<div className="flex h-screen w-screen flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+			<header className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-4 dark:border-neutral-800">
+				<nav className="flex">
+					<TabButton
+						active={tab === "wallpaper"}
+						onClick={() => setTab("wallpaper")}
+					>
+						Wallpaper
+					</TabButton>
+
+					<TabButton
+						active={tab === "widgets"}
+						onClick={() => setTab("widgets")}
+					>
+						Widgets
+						{settings.overlays.length > 0 && (
+							<span className="ml-1.5 font-mono text-[9px] text-neutral-400">
+								{settings.overlays.length}
+							</span>
+						)}
+					</TabButton>
+				</nav>
+			</header>
+
+			<main className="min-h-0 flex-1 overflow-y-auto">
+				<div className="mx-auto w-full max-w-xl px-4 py-3">
+					{tab === "wallpaper" ? (
+						<WallpaperTab
+							settings={settings}
+							urlInput={urlInput}
+							setUrlInput={setUrlInput}
+							isSavingFile={isSavingFile}
+							handleFileUpload={handleFileUpload}
+							handleUrlApply={handleUrlApply}
+							toggleSetting={toggleSetting}
+							updateVolume={updateVolume}
+						/>
+					) : (
+						<WidgetsTab
+							settings={settings}
+							overlayUrlInput={overlayUrlInput}
+							setOverlayUrlInput={setOverlayUrlInput}
+							expandedOverlays={expandedOverlays}
+							setExpandedOverlays={setExpandedOverlays}
+							handleAddOverlay={handleAddOverlay}
+							updateOverlay={updateOverlay}
+							removeOverlay={removeOverlay}
+							setOverlayPosition={setOverlayPosition}
+						/>
+					)}
+				</div>
+			</main>
+
+			<footer className="shrink-0 border-t border-neutral-200 px-4 py-3 text-[9px] text-neutral-400 dark:border-neutral-800">
+				<p className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">
+					Any URL can be used as a wallpaper or widget source.
+				</p>
+				<p className="text-[10px]">
+					Built with Rust and Typescript by @emjjkk
+				</p>
+			</footer>
+		</div>
+	);
+}
+
+function WallpaperTab({
+	settings,
+	urlInput,
+	setUrlInput,
+	isSavingFile,
+	handleFileUpload,
+	handleUrlApply,
+	toggleSetting,
+	updateVolume,
+}: {
+	settings: AppSettings;
+	urlInput: string;
+	setUrlInput: (value: string) => void;
+	isSavingFile: boolean;
+	handleFileUpload: () => void;
+	handleUrlApply: () => void;
+	toggleSetting: (
+		key: "autostart" | "pause_on_battery" | "pause_on_unfocus" | "is_muted",
+	) => void;
+	updateVolume: (volume: number) => void;
+}) {
+	return (
+		<div>
+			<div className="flex gap-1.5">
+				<input
+					type="url"
+					placeholder="Wallpaper URL"
+					value={urlInput}
+					onChange={(e) => setUrlInput(e.target.value)}
+					onKeyDown={(e) => {
+						if (e.key === "Enter") {
+							handleUrlApply();
+						}
+					}}
+					className={inputClass}
+				/>
+
+				<button
+					type="button"
+					onClick={handleUrlApply}
+					className={primaryButtonClass}
+				>
+					Apply
+				</button>
+			</div>
+
+			<button
+				type="button"
+				onClick={handleFileUpload}
+				disabled={isSavingFile}
+				className="mt-1.5 flex w-full cursor-pointer items-center justify-between border border-dashed border-neutral-200 px-2.5 py-2 text-left disabled:cursor-wait disabled:opacity-60 dark:border-neutral-800"
+			>
+				<span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+					{isSavingFile
+						? "Copying wallpaper..."
+						: "Local image or video"}
+				</span>
+
+				<span className="font-mono text-[9px] uppercase tracking-wide text-neutral-400">
+					{isSavingFile ? "Please wait" : "Browse"}
+				</span>
+			</button>
+
+			<div className="mt-4 border-y border-neutral-200 dark:border-neutral-800">
+				<SettingRow
+					label="Volume"
+					value={
+						settings.is_muted
+							? "Muted"
+							: `${Math.round(settings.volume * 100)}%`
+					}
+				>
+					<button
+						type="button"
+						onClick={() => toggleSetting("is_muted")}
+						className={subtleButtonClass}
+					>
+						{settings.is_muted ? "Unmute" : "Mute"}
+					</button>
+				</SettingRow>
+
+				<div className="border-b border-neutral-200 pb-2.5 dark:border-neutral-800">
+					<VolumeControl
+						settings={settings}
+						onChange={updateVolume}
+					/>
+				</div>
+
+				<ToggleRow
+					label="Run on startup"
+					checked={settings.autostart}
+					onChange={() => toggleSetting("autostart")}
+				/>
+
+				<ToggleRow
+					label="Pause when on battery power"
+					checked={settings.pause_on_battery}
+					onChange={() => toggleSetting("pause_on_battery")}
+				/>
+
+				<ToggleRow
+					label="Pause when unfocused"
+					checked={settings.pause_on_unfocus}
+					onChange={() => toggleSetting("pause_on_unfocus")}
+				/>
+			</div>
+
+			<div className="mt-3 truncate font-mono text-[9px] text-neutral-400">
+				Current wallpaper source:
+				<br />
+				{settings.wallpaper_src}
+			</div>
+		</div>
+	);
+}
+
+function VolumeControl({
+	settings,
+	onChange,
+}: {
+	settings: AppSettings;
+	onChange: (value: number) => void;
+}) {
+	const [value, setValue] = useState(settings.volume);
+
+	useEffect(() => {
+		setValue(settings.volume);
+	}, [settings.volume]);
+
+	const handleChange = (next: number) => {
+		setValue(next);
+		onChange(next);
+	};
+
+	return (
+		<div className="flex items-center gap-3">
+			<input
+				type="range"
+				min="0"
+				max="1"
+				step="0.01"
+				value={settings.is_muted ? 0 : value}
+				disabled={settings.is_muted}
+				onChange={(e) =>
+					handleChange(parseFloat(e.target.value))
+				}
+				className="h-1 w-full cursor-pointer appearance-none rounded-none bg-neutral-200 accent-neutral-900 disabled:cursor-default disabled:opacity-30 dark:bg-neutral-800 dark:accent-white"
+			/>
+
+			<span className="w-8 shrink-0 text-right font-mono text-[9px] text-neutral-400">
+				{settings.is_muted
+					? "0%"
+					: `${Math.round(value * 100)}%`}
+			</span>
+		</div>
+	);
+}
+
+function WidgetsTab({
+	settings,
+	overlayUrlInput,
+	setOverlayUrlInput,
+	expandedOverlays,
+	setExpandedOverlays,
+	handleAddOverlay,
+	updateOverlay,
+	removeOverlay,
+	setOverlayPosition,
+}: {
+	settings: AppSettings;
+	overlayUrlInput: string;
+	setOverlayUrlInput: (value: string) => void;
+	expandedOverlays: Record<string, boolean>;
+	setExpandedOverlays: React.Dispatch<
+		React.SetStateAction<Record<string, boolean>>
+	>;
+	handleAddOverlay: () => void;
+	updateOverlay: (
+		id: string,
+		changes: Partial<WallpaperOverlay>,
+	) => void;
+	removeOverlay: (id: string) => void;
+	setOverlayPosition: (
+		overlay: WallpaperOverlay,
+		horizontal?: "left" | "center" | "right",
+		vertical?: "top" | "center" | "bottom",
+	) => void;
+}) {
+	return (
+		<div>
+			<div className="flex gap-1.5">
+				<input
+					type="url"
+					placeholder="Widget URL"
+					value={overlayUrlInput}
+					onChange={(e) => setOverlayUrlInput(e.target.value)}
+					onKeyDown={(e) => {
+						if (e.key === "Enter") {
+							handleAddOverlay();
+						}
+					}}
+					className={inputClass}
+				/>
+
+				<button
+					type="button"
+					onClick={handleAddOverlay}
+					className={primaryButtonClass}
+				>
+					Add
+				</button>
+			</div>
+
+			<div className="mt-3 divide-y divide-neutral-200 border-y border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+				{settings.overlays.length === 0 ? (
+					<div className="py-8 text-center font-mono text-[10px] text-neutral-400">
+						No widgets
+					</div>
+				) : (
+					settings.overlays.map((overlay) => {
+						const expanded =
+							expandedOverlays[overlay.id] ?? false;
+
+						return (
+							<div key={overlay.id} className="py-2.5">
+								<div className="flex items-center justify-between gap-3">
+									<button
+										type="button"
+										onClick={() =>
+											setExpandedOverlays((current) => ({
+												...current,
+												[overlay.id]: !expanded,
+											}))
+										}
+										className="min-w-0 flex-1 truncate text-left font-mono text-[10px] text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
+									>
+										{getHostname(overlay.url)}
+									</button>
+
+									<button
+										type="button"
+										onClick={() =>
+											removeOverlay(overlay.id)
+										}
+										className={subtleButtonClass}
+									>
+										Remove
+									</button>
+								</div>
+
+								{expanded && (
+									<div className="mt-3 space-y-3">
+										<div className="grid grid-cols-2 gap-2">
+											<ScrubbableNumber
+												label="X"
+												value={overlay.x}
+												min={0}
+												max={100}
+												step={1}
+												suffix="%"
+												onChange={(value) =>
+													updateOverlay(
+														overlay.id,
+														{ x: value },
+													)
+												}
+											/>
+
+											<ScrubbableNumber
+												label="Y"
+												value={overlay.y}
+												min={0}
+												max={100}
+												step={1}
+												suffix="%"
+												onChange={(value) =>
+													updateOverlay(
+														overlay.id,
+														{ y: value },
+													)
+												}
+											/>
+
+											<ScrubbableNumber
+												label="W"
+												value={overlay.width}
+												min={1}
+												max={4320}
+												step={1}
+												suffix="px"
+												onChange={(value) =>
+													updateOverlay(
+														overlay.id,
+														{ width: value },
+													)
+												}
+											/>
+
+											<ScrubbableNumber
+												label="H"
+												value={overlay.height}
+												min={1}
+												max={4320}
+												step={1}
+												suffix="px"
+												onChange={(value) =>
+													updateOverlay(
+														overlay.id,
+														{ height: value },
+													)
+												}
+											/>
+										</div>
+
+										<div className="flex border border-neutral-200 dark:border-neutral-800">
+											<AlignmentButton
+												active={overlay.x === 0}
+												onClick={() =>
+													setOverlayPosition(
+														overlay,
+														"left",
+													)
+												}
+											>
+												Left
+											</AlignmentButton>
+
+											<AlignmentButton
+												active={overlay.x === 50}
+												onClick={() =>
+													setOverlayPosition(
+														overlay,
+														"center",
+													)
+												}
+											>
+												Center
+											</AlignmentButton>
+
+											<AlignmentButton
+												active={overlay.x === 100}
+												onClick={() =>
+													setOverlayPosition(
+														overlay,
+														"right",
+													)
+												}
+											>
+												Right
+											</AlignmentButton>
+
+											<AlignmentButton
+												active={overlay.y === 0}
+												onClick={() =>
+													setOverlayPosition(
+														overlay,
+														undefined,
+														"top",
+													)
+												}
+											>
+												Top
+											</AlignmentButton>
+
+											<AlignmentButton
+												active={overlay.y === 50}
+												onClick={() =>
+													setOverlayPosition(
+														overlay,
+														undefined,
+														"center",
+													)
+												}
+											>
+												Middle
+											</AlignmentButton>
+
+											<AlignmentButton
+												active={overlay.y === 100}
+												onClick={() =>
+													setOverlayPosition(
+														overlay,
+														undefined,
+														"bottom",
+													)
+												}
+											>
+												Bottom
+											</AlignmentButton>
+										</div>
+									</div>
+								)}
+							</div>
+						);
+					})
+				)}
+			</div>
+		</div>
+	);
+}
+
+function ScrubbableNumber({
+	label,
+	value,
+	min,
+	max,
+	step,
+	suffix,
+	onChange,
+}: {
+	label: string;
+	value: number;
+	min: number;
+	max: number;
+	step: number;
+	suffix: string;
+	onChange: (value: number) => void;
+}) {
+	const [editing, setEditing] = useState(false);
+	const [draft, setDraft] = useState(String(value));
+
+	const startX = useRef(0);
+	const startValue = useRef(value);
+	const dragging = useRef(false);
+
+	useEffect(() => {
+		if (!editing && !dragging.current) {
+			setDraft(formatNumber(value));
+		}
+	}, [value, editing]);
+
+	const commit = () => {
+		const parsed = Number(draft);
+
+		if (Number.isFinite(parsed)) {
+			const next = clampNumber(parsed, min, max);
+			const rounded = roundToStep(next, step);
+
+			onChange(rounded);
+			setDraft(formatNumber(rounded));
+		} else {
+			setDraft(formatNumber(value));
+		}
+
+		setEditing(false);
+	};
+
+	const handlePointerDown = (
+		e: ReactPointerEvent<HTMLButtonElement>,
+	) => {
+		if (e.button !== 0) {
+			return;
+		}
+
+		dragging.current = false;
+		startX.current = e.clientX;
+		startValue.current = value;
+
+		e.currentTarget.setPointerCapture(e.pointerId);
+	};
+
+	const handlePointerMove = (
+		e: ReactPointerEvent<HTMLButtonElement>,
+	) => {
+		if (!e.currentTarget.hasPointerCapture(e.pointerId)) {
+			return;
+		}
+
+		const delta = e.clientX - startX.current;
+
+		if (Math.abs(delta) > 2) {
+			dragging.current = true;
+		}
+
+		if (!dragging.current) {
+			return;
+		}
+
+		const pixelsPerStep = step < 1 ? 4 : 2;
+		const steps = Math.round(delta / pixelsPerStep);
+
+		const next = clampNumber(
+			startValue.current + steps * step,
+			min,
+			max,
+		);
+
+		onChange(roundToStep(next, step));
+	};
+
+	const handlePointerUp = (
+		e: ReactPointerEvent<HTMLButtonElement>,
+	) => {
+		if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+			e.currentTarget.releasePointerCapture(e.pointerId);
+		}
+
+		if (!dragging.current) {
+			setEditing(true);
+			setDraft(formatNumber(value));
+		}
+
+		dragging.current = false;
+	};
+
+	if (editing) {
+		return (
+			<div className="flex items-center gap-2">
+				<span className="w-4 font-mono text-[9px] text-neutral-400">
+					{label}
+				</span>
+
+				<input
+					autoFocus
+					type="number"
+					min={min}
+					max={max}
+					step={step}
+					value={draft}
+					onChange={(e) => setDraft(e.target.value)}
+					onBlur={commit}
+					onKeyDown={(e) => {
+						if (e.key === "Enter") {
+							commit();
+						}
+
+						if (e.key === "Escape") {
+							setEditing(false);
+							setDraft(formatNumber(value));
+						}
+					}}
+					className={`${inputClass} py-1`}
+				/>
+
+				<span className="w-5 text-right font-mono text-[9px] text-neutral-400">
+					{suffix}
+				</span>
+			</div>
+		);
+	}
+
+	return (
+		<div className="flex items-center gap-2">
+			<span className="w-4 font-mono text-[9px] text-neutral-400">
+				{label}
+			</span>
+
+			<button
+				type="button"
+				onPointerDown={handlePointerDown}
+				onPointerMove={handlePointerMove}
+				onPointerUp={handlePointerUp}
+				className="flex min-w-0 flex-1 cursor-ew-resize items-center justify-between border border-neutral-200 bg-neutral-50 px-2 py-1.5 text-left font-mono text-[10px] text-neutral-700 select-none hover:border-neutral-300 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-neutral-700 dark:hover:bg-neutral-800"
+				title="Drag to adjust. Click to type."
+			>
+				<span>{formatNumber(value)}</span>
+				<span className="ml-2 text-[8px] text-neutral-400">
+					{suffix}
+				</span>
+			</button>
+		</div>
+	);
+}
+
+function AlignmentButton({
+	children,
+	active,
+	onClick,
+}: {
+	children: React.ReactNode;
+	active: boolean;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className={`border-r border-neutral-200 px-2 py-1.5 text-[9px] transition-colors last:border-r-0 dark:border-neutral-800 ${
+				active
+					? "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white"
+					: "bg-white text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700 dark:bg-neutral-950 dark:text-neutral-500 dark:hover:bg-neutral-900 dark:hover:text-neutral-200"
+			}`}
+		>
+			{children}
+		</button>
+	);
+}
+
+function SettingRow({
+	label,
+	value,
+	children,
+}: {
+	label: string;
+	value?: string;
+	children?: React.ReactNode;
+}) {
+	return (
+		<div className="flex min-h-10 items-center justify-between gap-3">
+			<span className="text-[11px] text-neutral-700 dark:text-neutral-300">
+				{label}
+			</span>
+
+			<div className="flex items-center gap-2">
+				{value && (
+					<span className="font-mono text-[9px] text-neutral-400">
+						{value}
+					</span>
+				)}
+
+				{children}
+			</div>
+		</div>
+	);
+}
+
+function ToggleRow({
+	label,
+	checked,
+	onChange,
+}: {
+	label: string;
+	checked: boolean;
+	onChange: () => void;
+}) {
+	return (
+		<SettingRow label={label}>
+			<button
+				type="button"
+				role="switch"
+				aria-checked={checked}
+				onClick={onChange}
+				className={`relative h-3.5 w-6 shrink-0 border transition-colors ${
+					checked
+						? "border-neutral-900 bg-neutral-900 dark:border-neutral-100 dark:bg-neutral-100"
+						: "border-neutral-300 bg-transparent dark:border-neutral-700"
+				}`}
+			>
+				<span
+					className={`absolute top-0.5 h-2 w-2 transition-transform ${
+						checked
+							? "translate-x-3 bg-white dark:bg-neutral-950"
+							: "translate-x-0.5 bg-neutral-400"
+					}`}
+				/>
+			</button>
+		</SettingRow>
+	);
+}
+
+function TabButton({
+	active,
+	onClick,
+	children,
+}: {
+	active: boolean;
+	onClick: () => void;
+	children: React.ReactNode;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			className={`relative px-2.5 py-2 text-[11px] transition-colors ${
+				active
+					? "text-neutral-900 dark:text-white"
+					: "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+			}`}
+		>
+			{children}
+
+			{active && (
+				<span className="absolute inset-x-2 bottom-0 h-px bg-neutral-900 dark:bg-neutral-100" />
+			)}
+		</button>
+	);
+}
+
+function getHostname(url: string): string {
+	try {
+		return new URL(url).hostname;
+	} catch {
+		return url;
+	}
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+	if (!Number.isFinite(value)) {
+		return min;
+	}
+
+	return Math.min(Math.max(value, min), max);
+}
+
+function roundToStep(value: number, step: number): number {
+	const decimals =
+		step < 1
+			? (String(step).split(".")[1]?.length ?? 1)
+			: 0;
+
+	const multiplier = 10 ** decimals;
+
+	return Math.round(value * multiplier) / multiplier;
+}
+
+function formatNumber(value: number): string {
+	return Number.isInteger(value)
+		? String(value)
+		: value.toFixed(1);
 }
 </file>
 
 <file path="src/windows/WallpaperWindow.tsx">
-import { useState, useEffect, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import type { AppSettings } from '../types/settings';
+import { useState, useEffect, useRef } from "react";
+
+import { invoke } from "@tauri-apps/api/core";
+
+import type { AppSettings } from "../types/settings";
 
 interface WallpaperWindowProps {
-  settings: AppSettings;
+	settings: AppSettings;
 }
 
 export function WallpaperWindow({ settings }: WallpaperWindowProps) {
-  const [isPaused, setIsPaused] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+	const [isPaused, setIsPaused] = useState(false);
 
-  // Focus & battery pausing logic
-  useEffect(() => {
-    let batteryInterval: ReturnType<typeof setInterval>;
+	const videoRef = useRef<HTMLVideoElement>(null);
 
-    const evaluatePauseConditions = async () => {
-      let pause = false;
+	const iframeRefs = useRef<Record<string, HTMLIFrameElement | null>>({});
 
-      // 1. Desktop focus check
-      if (settings.pause_on_unfocus && !document.hasFocus()) {
-        pause = true;
-      }
+	/*
+	 * Focus & battery pausing logic.
+	 */
+	useEffect(() => {
+		let batteryInterval: ReturnType<typeof setInterval> | undefined;
 
-      // 2. Battery power check
-      if (settings.pause_on_battery && !pause) {
-        try {
-          const onBattery = await invoke<boolean>('check_is_on_battery');
-          if (onBattery) pause = true;
-        } catch {
-          if ('getBattery' in navigator) {
-            const battery: any = await (navigator as any).getBattery();
-            if (!battery.charging) pause = true;
-          }
-        }
-      }
+		const evaluatePauseConditions = async () => {
+			let pause = false;
 
-      setIsPaused(pause);
-    };
+			/*
+			 * Desktop focus check.
+			 */
+			if (settings.pause_on_unfocus && !document.hasFocus()) {
+				pause = true;
+			}
 
-    const handleFocus = () => evaluatePauseConditions();
-    const handleBlur = () => evaluatePauseConditions();
+			/*
+			 * Battery power check.
+			 */
+			if (settings.pause_on_battery && !pause) {
+				try {
+					const onBattery = await invoke<boolean>("check_is_on_battery");
 
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('blur', handleBlur);
+					if (onBattery) {
+						pause = true;
+					}
+				} catch {
+					if ("getBattery" in navigator) {
+						try {
+							const battery: any = await (navigator as any).getBattery();
 
-    // Focus changes are already caught instantly by the listeners above; this
-    // interval only exists to catch AC-power-source changes, which don't have
-    // a native event. 15s instead of 4s - a plugged/unplugged transition
-    // being reflected up to 15s late is imperceptible on a wallpaper, and
-    // this cuts the IPC round-trips roughly 4x.
-    batteryInterval = setInterval(evaluatePauseConditions, 15000);
-    evaluatePauseConditions();
+							if (!battery.charging) {
+								pause = true;
+							}
+						} catch {
+							// Ignore battery API failures.
+						}
+					}
+				}
+			}
 
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('blur', handleBlur);
-      clearInterval(batteryInterval);
-    };
-  }, [settings.pause_on_battery, settings.pause_on_unfocus]);
+			setIsPaused(pause);
+		};
 
-  // Video element playback and audio management
-  useEffect(() => {
-    if (videoRef.current) {
-      if (isPaused) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play().catch(() => {});
-      }
-      videoRef.current.volume = settings.is_muted ? 0 : settings.volume;
-    }
-  }, [isPaused, settings.volume, settings.is_muted, settings.wallpaper_src]);
+		const handleFocus = () => {
+			evaluatePauseConditions();
+		};
 
-  // Playback watchdog: WebView2/Chromium can pause or stall media on windows it
-  // considers backgrounded/occluded (which our wallpaper window always is, since
-  // it sits behind the desktop icons). This resumes playback whenever the video
-  // stops on its own without us having asked it to (isPaused is false).
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || settings.wallpaper_type !== 'video') return;
+		const handleBlur = () => {
+			evaluatePauseConditions();
+		};
 
-    const resumeIfNeeded = () => {
-      if (!isPaused && video.paused) {
-        video.play().catch(() => {});
-      }
-    };
+		window.addEventListener("focus", handleFocus);
 
-    video.addEventListener('pause', resumeIfNeeded);
-    video.addEventListener('suspend', resumeIfNeeded);
-    video.addEventListener('stalled', resumeIfNeeded);
-    document.addEventListener('visibilitychange', resumeIfNeeded);
+		window.addEventListener("blur", handleBlur);
 
-    // 8s instead of 4s - this is only a safety net for the rare case the
-    // event listeners above miss a stall; halving the wake-up rate is free.
-    const watchdog = setInterval(resumeIfNeeded, 8000);
+		/*
+		 * Catch AC/battery changes periodically.
+		 */
+		batteryInterval = setInterval(evaluatePauseConditions, 15000);
 
-    return () => {
-      video.removeEventListener('pause', resumeIfNeeded);
-      video.removeEventListener('suspend', resumeIfNeeded);
-      video.removeEventListener('stalled', resumeIfNeeded);
-      document.removeEventListener('visibilitychange', resumeIfNeeded);
-      clearInterval(watchdog);
-    };
-  }, [isPaused, settings.wallpaper_type]);
+		evaluatePauseConditions();
 
-  // Webpage postMessage sync for audio
-  useEffect(() => {
-    if (iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage(
-        {
-          type: 'SET_AUDIO',
-          volume: settings.is_muted ? 0 : settings.volume,
-          isPaused,
-        },
-        '*'
-      );
-    }
-  }, [settings.volume, settings.is_muted, isPaused]);
+		return () => {
+			window.removeEventListener("focus", handleFocus);
 
-  return (
-    <main className="w-screen h-screen overflow-hidden bg-black select-none pointer-events-none">
-      {settings.wallpaper_type === 'webpage' ? (
-        <iframe
-          ref={iframeRef}
-          src={settings.wallpaper_src}
-          title="Wallpaper Webpage"
-          className={`w-full h-full border-0 transition-opacity duration-300 ${
-            isPaused ? 'opacity-30' : 'opacity-100'
-          }`}
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-        />
-      ) : settings.wallpaper_type === 'video' ? (
-        <video
-          ref={videoRef}
-          src={settings.wallpaper_src}
-          autoPlay
-          loop
-          muted={settings.is_muted}
-          playsInline
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
-            isPaused ? 'opacity-30' : 'opacity-100'
-          }`}
-        />
-      ) : (
-        <img
-          src={settings.wallpaper_src}
-          alt="Wallpaper"
-          className="w-full h-full object-cover"
-        />
-      )}
-    </main>
-  );
+			window.removeEventListener("blur", handleBlur);
+
+			if (batteryInterval) {
+				clearInterval(batteryInterval);
+			}
+		};
+	}, [settings.pause_on_battery, settings.pause_on_unfocus]);
+
+	/*
+	 * Video playback and audio management.
+	 */
+	useEffect(() => {
+		const video = videoRef.current;
+
+		if (!video) {
+			return;
+		}
+
+		video.volume = settings.is_muted ? 0 : settings.volume;
+
+		if (isPaused) {
+			video.pause();
+		} else {
+			video.play().catch(() => {});
+		}
+	}, [isPaused, settings.volume, settings.is_muted, settings.wallpaper_src]);
+
+	/*
+	 * Video playback watchdog.
+	 */
+	useEffect(() => {
+		const video = videoRef.current;
+
+		if (!video || settings.wallpaper_type !== "video") {
+			return;
+		}
+
+		const resumeIfNeeded = () => {
+			if (!isPaused && video.paused) {
+				video.play().catch(() => {});
+			}
+		};
+
+		video.addEventListener("pause", resumeIfNeeded);
+
+		video.addEventListener("suspend", resumeIfNeeded);
+
+		video.addEventListener("stalled", resumeIfNeeded);
+
+		document.addEventListener("visibilitychange", resumeIfNeeded);
+
+		const watchdog = setInterval(resumeIfNeeded, 8000);
+
+		return () => {
+			video.removeEventListener("pause", resumeIfNeeded);
+
+			video.removeEventListener("suspend", resumeIfNeeded);
+
+			video.removeEventListener("stalled", resumeIfNeeded);
+
+			document.removeEventListener("visibilitychange", resumeIfNeeded);
+
+			clearInterval(watchdog);
+		};
+	}, [isPaused, settings.wallpaper_type]);
+
+	/*
+	 * Keep webpage wallpaper audio synchronized.
+	 */
+	useEffect(() => {
+		const iframe = iframeRefs.current["__wallpaper__"];
+
+		if (!iframe?.contentWindow) {
+			return;
+		}
+
+		iframe.contentWindow.postMessage(
+			{
+				type: "SET_AUDIO",
+				volume: settings.is_muted ? 0 : settings.volume,
+				isPaused,
+			},
+			"*",
+		);
+	}, [settings.volume, settings.is_muted, isPaused, settings.wallpaper_src]);
+
+	/*
+	 * Notify widgets when the wallpaper
+	 * enters/leaves its paused state.
+	 */
+	useEffect(() => {
+		for (const overlay of settings.overlays) {
+			const iframe = iframeRefs.current[overlay.id];
+
+			if (!iframe?.contentWindow) {
+				continue;
+			}
+
+			iframe.contentWindow.postMessage(
+				{
+					type: "SET_PAUSED",
+					isPaused,
+				},
+				"*",
+			);
+		}
+	}, [settings.overlays, isPaused]);
+
+	return (
+		<main className="relative h-screen w-screen overflow-hidden bg-black select-none pointer-events-none">
+			{/* Main wallpaper */}
+			{settings.wallpaper_type === "webpage" ? (
+				<iframe
+					ref={(element) => {
+						iframeRefs.current["__wallpaper__"] = element;
+					}}
+					src={settings.wallpaper_src}
+					title="Wallpaper Webpage"
+					className={`absolute inset-0 h-full w-full border-0 transition-opacity duration-300 ${isPaused ? "opacity-30" : "opacity-100"}`}
+					sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+				/>
+			) : settings.wallpaper_type === "video" ? (
+				<video
+					ref={videoRef}
+					src={settings.wallpaper_src}
+					autoPlay
+					loop
+					muted={settings.is_muted}
+					playsInline
+					className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${isPaused ? "opacity-30" : "opacity-100"}`}
+				/>
+			) : (
+				<img src={settings.wallpaper_src} alt="Wallpaper" className="absolute inset-0 h-full w-full object-cover" />
+			)}
+
+			{/* URL widgets */}
+			{settings.overlays.map((overlay) => (
+				<iframe
+					key={overlay.id}
+					ref={(element) => {
+						iframeRefs.current[overlay.id] = element;
+					}}
+					src={overlay.url}
+					title={`Wallpaper widget ${overlay.id}`}
+					className="absolute border-0"
+					style={{
+						left: `${overlay.x}%`,
+						top: `${overlay.y}%`,
+						width: `${overlay.width}px`,
+						height: `${overlay.height}px`,
+					}}
+					sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+				/>
+			))}
+		</main>
+	);
 }
 </file>
 
 <file path="src/globals.css">
 @import "tailwindcss";
+
+html,
+body,
+#root {
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	font-family:
+		ui-monospace,
+		SFMono-Regular,
+		Menlo,
+		Monaco,
+		Consolas,
+		"Liberation Mono",
+		"Courier New",
+		monospace;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+	margin: 0;
+	appearance: none;
+}
+
+input[type="number"] {
+	appearance: textfield;
+}
 </file>
 
 <file path="src/vite-env.d.ts">
@@ -714,79 +1826,78 @@ dist-ssr
 
 <file path="tsconfig.json">
 {
-  "compilerOptions": {
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
+	"compilerOptions": {
+		"target": "ES2020",
+		"useDefineForClassFields": true,
+		"lib": ["ES2020", "DOM", "DOM.Iterable"],
+		"module": "ESNext",
+		"skipLibCheck": true,
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx",
+		/* Bundler mode */
+		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"noEmit": true,
+		"jsx": "react-jsx",
 
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
-  },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+		/* Linting */
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noFallthroughCasesInSwitch": true
+	},
+	"include": ["src"],
+	"references": [{ "path": "./tsconfig.node.json" }]
 }
 </file>
 
 <file path="tsconfig.node.json">
 {
-  "compilerOptions": {
-    "composite": true,
-    "skipLibCheck": true,
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true
-  },
-  "include": ["vite.config.ts"]
+	"compilerOptions": {
+		"composite": true,
+		"skipLibCheck": true,
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"allowSyntheticDefaultImports": true
+	},
+	"include": ["vite.config.ts"]
 }
 </file>
 
 <file path="vite.config.ts">
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import tailwindcss from '@tailwindcss/vite'
-
+import tailwindcss from "@tailwindcss/vite";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [react(), tailwindcss()],
+	plugins: [react(), tailwindcss()],
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
-  clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
-  server: {
-    port: 1420,
-    strictPort: true,
-    host: host || false,
-    hmr: host
-      ? {
-          protocol: "ws",
-          host,
-          port: 1421,
-        }
-      : undefined,
-    watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
-    },
-  },
+	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
+	//
+	// 1. prevent Vite from obscuring rust errors
+	clearScreen: false,
+	// 2. tauri expects a fixed port, fail if that port is not available
+	server: {
+		port: 1420,
+		strictPort: true,
+		host: host || false,
+		hmr: host
+			? {
+					protocol: "ws",
+					host,
+					port: 1421,
+				}
+			: undefined,
+		watch: {
+			// 3. tell Vite to ignore watching `src-tauri`
+			ignored: ["**/src-tauri/**"],
+		},
+	},
 }));
 </file>
 
@@ -797,43 +1908,48 @@ import App from "./App";
 import "./globals.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+	<React.StrictMode>
+		<App />
+	</React.StrictMode>,
 );
 </file>
 
 <file path="package.json">
 {
-  "name": "livewall",
-  "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri"
-  },
-  "dependencies": {
-    "@tailwindcss/vite": "^4.3.3",
-    "@tauri-apps/api": "^2.11.1",
-    "@tauri-apps/plugin-autostart": "^2.5.1",
-    "@tauri-apps/plugin-dialog": "^2.7.2",
-    "@tauri-apps/plugin-opener": "^2",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "tailwindcss": "^4.3.3",
-    "tauri-plugin-wallpaper": "^3.0.0"
-  },
-  "devDependencies": {
-    "@tauri-apps/cli": "^2",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "typescript": "~5.8.3",
-    "vite": "^7.0.4"
-  }
+	"name": "livewall",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc && vite build",
+		"preview": "vite preview",
+		"tauri": "tauri",
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"lint": "biome lint .",
+		"check": "biome check --write ."
+	},
+	"dependencies": {
+		"@tailwindcss/vite": "^4.3.3",
+		"@tauri-apps/api": "^2.11.1",
+		"@tauri-apps/plugin-autostart": "^2.5.1",
+		"@tauri-apps/plugin-dialog": "^2.7.2",
+		"@tauri-apps/plugin-opener": "^2",
+		"react": "^19.1.0",
+		"react-dom": "^19.1.0",
+		"tailwindcss": "^4.3.3",
+		"tauri-plugin-wallpaper": "^3.0.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.10",
+		"@tauri-apps/cli": "^2",
+		"@types/react": "^19.1.8",
+		"@types/react-dom": "^19.1.6",
+		"@vitejs/plugin-react": "^4.6.0",
+		"typescript": "~5.8.3",
+		"vite": "^7.0.4"
+	}
 }
 </file>
 
@@ -874,21 +1990,22 @@ MIT
 
 <file path="src-tauri/capabilities/default.json">
 {
-  "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main", "settings"],
-  "permissions": [
-    "core:default",
-    "opener:default",
-    "wallpaper:default",
-    "autostart:allow-enable",
-    "autostart:allow-disable",
-    "autostart:allow-is-enabled",
-    "store:allow-get",
-    "store:allow-set",
-    "store:allow-save"
-  ]
+	"$schema": "../gen/schemas/desktop-schema.json",
+	"identifier": "default",
+	"description": "Capability for the main window",
+	"windows": ["main", "settings"],
+	"permissions": [
+		"core:default",
+		"opener:default",
+		"wallpaper:default",
+		"autostart:allow-enable",
+		"autostart:allow-disable",
+		"autostart:allow-is-enabled",
+		"store:allow-get",
+		"store:allow-set",
+		"store:allow-save",
+		"dialog:default"
+	]
 }
 </file>
 
@@ -900,12 +2017,7 @@ description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [lib]
-# The `_lib` suffix may seem redundant but it is necessary
-# to make the lib name unique and wouldn't conflict with the bin name.
-# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "livewall_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
@@ -915,6 +2027,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2.7.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-wallpaper = "3.0.0"
@@ -972,26 +2085,26 @@ winapi = { version = "0.3", features = ["winuser", "winbase"] }
 </file>
 
 <file path="src/App.tsx">
-import { useSettings } from './hooks/useSettings';
-import { WallpaperWindow } from './windows/WallpaperWindow';
-import { SettingsWindow } from './windows/SettingsWindow';
+import { useSettings } from "./hooks/useSettings";
+import { WallpaperWindow } from "./windows/WallpaperWindow";
+import { SettingsWindow } from "./windows/SettingsWindow";
 
 export default function App() {
-  const params = new URLSearchParams(window.location.search);
-  const isSettingsWindow = params.has('settings');
+	const params = new URLSearchParams(window.location.search);
+	const isSettingsWindow = params.has("settings");
 
-  const { settings, updateSettings } = useSettings();
+	const { settings, updateSettings } = useSettings();
 
-  // Pre-render buffer prevents settings window from flashing the wallpaper on load
-  if (!settings) {
-    return <div className="w-screen h-screen bg-slate-900" />;
-  }
+	// Pre-render buffer prevents settings window from flashing the wallpaper on load
+	if (!settings) {
+		return <div className="w-screen h-screen bg-slate-900" />;
+	}
 
-  if (isSettingsWindow) {
-    return <SettingsWindow settings={settings} onUpdate={updateSettings} />;
-  }
+	if (isSettingsWindow) {
+		return <SettingsWindow settings={settings} onUpdate={updateSettings} />;
+	}
 
-  return <WallpaperWindow settings={settings} />;
+	return <WallpaperWindow settings={settings} />;
 }
 </file>
 
@@ -999,22 +2112,46 @@ export default function App() {
 use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{Menu, MenuItem},
+    path::BaseDirectory,
     tray::TrayIconBuilder,
     AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder,
 };
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_store::StoreExt;
-use tauri_plugin_wallpaper::{AttachRequest, PinRequest, WallpaperExt};
+use tauri_plugin_wallpaper::{
+    AttachRequest,
+    PinRequest,
+    WallpaperExt,
+};
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct WallpaperOverlay {
+    pub id: String,
+    pub url: String,
+
+    // Position is stored as a percentage of the wallpaper window.
+    pub x: f32,
+    pub y: f32,
+
+    // Size is stored in pixels.
+    pub width: f32,
+    pub height: f32,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppSettings {
-    pub wallpaper_type: String, // "image" | "video" | "webpage"
+    pub wallpaper_type: String,
     pub wallpaper_src: String,
+
     pub autostart: bool,
     pub pause_on_battery: bool,
     pub pause_on_unfocus: bool,
+
     pub volume: f32,
     pub is_muted: bool,
+
+    #[serde(default)]
+    pub overlays: Vec<WallpaperOverlay>,
 }
 
 impl Default for AppSettings {
@@ -1022,218 +2159,426 @@ impl Default for AppSettings {
         Self {
             wallpaper_type: "image".into(),
             wallpaper_src: "https://images.unsplash.com/photo-1707343843437-caacff5cfa74?q=80&w=1920".into(),
+
             autostart: false,
             pause_on_battery: false,
             pause_on_unfocus: false,
+
             volume: 1.0,
             is_muted: false,
+
+            overlays: Vec::new(),
         }
     }
 }
 
-// Inter-process command: Reads persisted configuration from settings.json
+/*
+ * Reads persisted configuration from settings.json.
+ */
 #[tauri::command]
 fn get_settings(app: AppHandle) -> AppSettings {
     let store = app.store("settings.json").unwrap();
+
     if let Some(val) = store.get("config") {
-        if let Ok(mut settings) = serde_json::from_value::<AppSettings>(val) {
-            // Self-heal old/broken configs: `blob:` URLs only ever live inside the
-            // browser session that created them, so one saved to disk can never be
-            // valid again once the app restarts (e.g. after a PC reboot). Without
-            // this, a wallpaper set from an uploaded file would silently fail to
-            // load forever, even though autostart is working correctly.
+        if let Ok(mut settings) =
+            serde_json::from_value::<AppSettings>(val)
+        {
+            /*
+             * Self-heal old/broken configs.
+             *
+             * blob: URLs only live inside the browser session that
+             * created them. If an older version saved one, replace it
+             * with the default wallpaper.
+             */
             if settings.wallpaper_src.starts_with("blob:") {
                 let defaults = AppSettings::default();
-                settings.wallpaper_type = defaults.wallpaper_type;
-                settings.wallpaper_src = defaults.wallpaper_src;
-                store.set("config", serde_json::to_value(&settings).unwrap());
+
+                settings.wallpaper_type =
+                    defaults.wallpaper_type;
+                settings.wallpaper_src =
+                    defaults.wallpaper_src;
+
+                store.set(
+                    "config",
+                    serde_json::to_value(&settings).unwrap(),
+                );
+
                 let _ = store.save();
             }
+
             return settings;
         }
     }
+
     AppSettings::default()
 }
 
-// Inter-process command: Persists new configuration to settings.json
+/*
+ * Persists new configuration to settings.json.
+ */
 #[tauri::command]
-fn update_settings(app: AppHandle, new_settings: AppSettings) -> Result<(), String> {
-    let store = app.store("settings.json").map_err(|e| e.to_string())?;
+fn update_settings(
+    app: AppHandle,
+    new_settings: AppSettings,
+) -> Result<(), String> {
+    let store = app
+        .store("settings.json")
+        .map_err(|e| e.to_string())?;
 
-    // Update autostart behavior dynamically
+    /*
+     * Update autostart behavior dynamically.
+     */
     let autostart_mgr = app.autolaunch();
+
     if new_settings.autostart {
         let _ = autostart_mgr.enable();
     } else {
         let _ = autostart_mgr.disable();
     }
 
-    // Write to disk immediately
-    store.set("config", serde_json::to_value(&new_settings).unwrap());
-    let _ = store.save();
+    /*
+     * Write configuration immediately.
+     */
+    store.set(
+        "config",
+        serde_json::to_value(&new_settings)
+            .map_err(|e| e.to_string())?,
+    );
 
-    // Broadcast update across windows (Settings & Main)
-    let _ = app.emit("settings-changed", new_settings);
+    store.save().map_err(|e| e.to_string())?;
+
+    /*
+     * Broadcast changes to every window.
+     */
+    let _ = app.emit(
+        "settings-changed",
+        new_settings,
+    );
+
     Ok(())
 }
 
-// Inter-process command: Checks Windows power status (AC vs Battery)
+/*
+ * Checks Windows power status.
+ */
 #[tauri::command]
 fn check_is_on_battery() -> bool {
     #[cfg(target_os = "windows")]
     {
         use std::mem::MaybeUninit;
-        use winapi::um::winbase::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
+        use winapi::um::winbase::{
+            GetSystemPowerStatus,
+            SYSTEM_POWER_STATUS,
+        };
 
         unsafe {
-            let mut status = MaybeUninit::<SYSTEM_POWER_STATUS>::uninit();
+            let mut status =
+                MaybeUninit::<SYSTEM_POWER_STATUS>::uninit();
+
             if GetSystemPowerStatus(status.as_mut_ptr()) != 0 {
                 let status = status.assume_init();
+
                 return status.ACLineStatus == 0;
             }
         }
     }
+
     false
 }
 
-// Inter-process command: Persists an uploaded local file (image/video) to disk
-// under the app's data directory and returns its absolute path. Local files
-// picked in Settings used to be referenced via a `blob:` object URL, which is
-// only valid for the lifetime of the webview that created it - it silently
-// breaks the moment the app restarts. Writing the bytes to a real file on disk
-// (served back to the frontend through Tauri's asset protocol via
-// convertFileSrc) makes the wallpaper survive restarts, including via
-// autostart.
+/*
+ * Persists an uploaded local file to disk.
+ *
+ * Files are stored under:
+ *
+ * %APPDATA%/com.os.livewall/wallpapers/
+ *
+ * The returned path is converted to a Tauri asset URL by the frontend.
+ */
 #[tauri::command]
-fn save_wallpaper_file(app: AppHandle, file_name: String, data: Vec<u8>) -> Result<String, String> {
+fn save_wallpaper_file(
+    app: AppHandle,
+    source_path: String,
+) -> Result<String, String> {
+    use std::fs;
+    use std::path::Path;
+
+    let source = Path::new(&source_path);
+
+    if !source.exists() {
+        return Err(format!(
+            "Wallpaper file does not exist: {}",
+            source_path
+        ));
+    }
+
+    if !source.is_file() {
+        return Err(format!(
+            "Wallpaper path is not a file: {}",
+            source_path
+        ));
+    }
+
+    let file_name = source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "Could not determine wallpaper filename".to_string())?;
+
     let base_dir = app
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
         .join("wallpapers");
 
-    std::fs::create_dir_all(&base_dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&base_dir)
+        .map_err(|e| e.to_string())?;
 
-    // Strip path separators / traversal attempts from the original file name
-    let safe_name = file_name.replace(['/', '\\'], "_").replace("..", "_");
+    /*
+     * Sanitize the original filename.
+     *
+     * The native dialog already gives us a real filesystem path,
+     * but we still don't want arbitrary path separators entering
+     * our destination filename.
+     */
+    let safe_name = file_name
+        .replace(['/', '\\'], "_")
+        .replace("..", "_");
 
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
+        .map(|duration| duration.as_millis())
         .unwrap_or(0);
 
-    let file_path = base_dir.join(format!("{}_{}", timestamp, safe_name));
-    std::fs::write(&file_path, data).map_err(|e| e.to_string())?;
+    let destination = base_dir.join(format!(
+        "{}_{}",
+        timestamp,
+        safe_name
+    ));
 
-    // Remove previously saved wallpaper files so old uploads don't pile up on disk
-    if let Ok(entries) = std::fs::read_dir(&base_dir) {
+    /*
+     * IMPORTANT:
+     *
+     * The large file is copied directly by Rust.
+     *
+     * The WebView never receives the bytes.
+     */
+    fs::copy(source, &destination)
+        .map_err(|e| {
+            format!(
+                "Failed to copy wallpaper: {}",
+                e
+            )
+        })?;
+
+    /*
+     * Only remove old wallpapers AFTER the new file has
+     * successfully been copied.
+     *
+     * This means a failed copy cannot destroy the currently
+     * working wallpaper.
+     */
+    if let Ok(entries) = fs::read_dir(&base_dir) {
         for entry in entries.flatten() {
             let entry_path = entry.path();
-            if entry_path != file_path {
-                let _ = std::fs::remove_file(entry_path);
+
+            if entry_path != destination
+                && entry_path.is_file()
+            {
+                let _ = fs::remove_file(entry_path);
             }
         }
     }
 
-    Ok(file_path.to_string_lossy().to_string())
+    Ok(destination
+        .to_string_lossy()
+        .to_string())
 }
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Chromium/WebView2 throttles timers and can suspend media playback on
-    // windows it considers backgrounded or occluded - which describes our
-    // wallpaper window perfectly, since it always sits behind the desktop
-    // icons and is frequently covered by other apps. Left unchecked, this is
-    // why video wallpapers appear to "stop playing after some time". These
-    // flags tell WebView2 not to apply that throttling.
-    //
-    // Trade-off: this also disables throttling when the window is covered by
-    // *other real application windows* (not just desktop icons), so it won't
-    // get the free CPU/GPU savings Chromium would otherwise give an occluded
-    // renderer in that case. The `pause_on_unfocus` setting is the intended
-    // substitute for that - worth confirming it actually fires for this
-    // window (see note in App.tsx).
+    /*
+     * WebView2 background throttling is problematic for a wallpaper
+     * window because Windows considers it backgrounded/occluded.
+     *
+     * These flags prevent Chromium from suspending the wallpaper's
+     * renderer and media playback.
+     */
     #[cfg(target_os = "windows")]
     std::env::set_var(
         "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-        "--disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding",
+        "--disable-background-timer-throttling \
+         --disable-backgrounding-occluded-windows \
+         --disable-renderer-backgrounding",
     );
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_wallpaper::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin( tauri_plugin_wallpaper::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_autostart::init(
-            MacosLauncher::LaunchAgent,
-            Some(vec!["--autostart"]),
-        ))
-        .invoke_handler(tauri::generate_handler![
-            get_settings,
-            update_settings,
-            check_is_on_battery,
-            save_wallpaper_file
-        ])
+        .plugin(
+            tauri_plugin_autostart::init(
+                MacosLauncher::LaunchAgent,
+                Some(vec!["--autostart"]),
+            ),
+        )
+        .invoke_handler(
+            tauri::generate_handler![
+                get_settings,
+                update_settings,
+                check_is_on_battery,
+                save_wallpaper_file
+            ],
+        )
         .setup(|app| {
             let handle = app.handle();
 
-            // Attach main window to desktop wallpaper layer (behind icons)
-            let _ = handle.wallpaper().attach(AttachRequest::new("main"));
-            let _ = handle.wallpaper().pin(PinRequest::new("main"));
+            /*
+             * Attach the main window to the Windows desktop
+             * wallpaper layer.
+             *
+             * IMPORTANT:
+             *
+             * The overlays are NOT separate windows.
+             * They are iframes inside this exact same window.
+             *
+             * Therefore Windows treats the wallpaper + all overlays
+             * as one desktop-layer window.
+             */
+            let _ = handle
+                .wallpaper()
+                .attach(
+                    AttachRequest::new("main"),
+                );
 
-            // Windows periodically recreates the desktop's WorkerW layer - e.g.
-            // after waking from sleep, changing resolution/DPI, or explorer.exe
-            // restarting - which detaches our window from behind the desktop
-            // icons and makes the wallpaper appear to freeze or vanish. Re-attach
-            // and re-pin on an interval so it keeps recovering on its own instead
-            // of staying broken until the app is manually restarted. 60s instead
-            // of 30s - this is a recovery net, not something that needs to react
-            // within half a minute, and it halves the thread's wake-ups.
+            let _ = handle
+                .wallpaper()
+                .pin(
+                    PinRequest::new("main"),
+                );
+
+            /*
+             * Windows can recreate WorkerW after:
+             *
+             * - Explorer restarts
+             * - waking from sleep
+             * - display changes
+             * - resolution changes
+             * - DPI changes
+             *
+             * Reattach periodically so the wallpaper can recover.
+             */
             let watchdog_handle = handle.clone();
+
             std::thread::spawn(move || loop {
-                std::thread::sleep(std::time::Duration::from_secs(60));
-                let _ = watchdog_handle.wallpaper().attach(AttachRequest::new("main"));
-                let _ = watchdog_handle.wallpaper().pin(PinRequest::new("main"));
+                std::thread::sleep(
+                    std::time::Duration::from_secs(60),
+                );
+
+                let _ = watchdog_handle
+                    .wallpaper()
+                    .attach(
+                        AttachRequest::new("main"),
+                    );
+
+                let _ = watchdog_handle
+                    .wallpaper()
+                    .pin(
+                        PinRequest::new("main"),
+                    );
             });
 
-            // Create System Tray Menu
+            /*
+             * System tray menu.
+             */
             let settings_item =
-                MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&settings_item, &quit_item])?;
+                MenuItem::with_id(
+                    app,
+                    "settings",
+                    "Settings",
+                    true,
+                    None::<&str>,
+                )?;
+
+            let quit_item =
+                MenuItem::with_id(
+                    app,
+                    "quit",
+                    "Quit",
+                    true,
+                    None::<&str>,
+                )?;
+
+            let menu =
+                Menu::with_items(
+                    app,
+                    &[
+                        &settings_item,
+                        &quit_item,
+                    ],
+                )?;
 
             TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(
+                    app.default_window_icon()
+                        .unwrap()
+                        .clone(),
+                )
                 .menu(&menu)
                 .show_menu_on_left_click(false)
-                .on_menu_event(move |app, event| match event.id.as_ref() {
-                    "settings" => {
-                        if let Some(window) = app.get_webview_window("settings") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        } else {
-                            // Spawn Settings Window with explicit search query string flag
-                            let _ = WebviewWindowBuilder::new(
-                                app,
-                                "settings",
-                                WebviewUrl::App("index.html?settings=true".into()),
-                            )
-                            .title("Wallpaper Settings")
-                            .inner_size(420.0, 560.0)
-                            .resizable(false)
-                            .center()
-                            .build();
+                .on_menu_event(
+                    move |app, event| {
+                        match event.id.as_ref() {
+                            "settings" => {
+                                if let Some(window) =
+                                    app.get_webview_window(
+                                        "settings",
+                                    )
+                                {
+                                    let _ =
+                                        window.show();
+
+                                    let _ =
+                                        window.set_focus();
+                                } else {
+                                    let _ =
+                                        WebviewWindowBuilder::new(
+                                            app,
+                                            "settings",
+                                            WebviewUrl::App(
+                                                "index.html?settings=true"
+                                                    .into(),
+                                            ),
+                                        )
+                                        .title(
+                                            "Wallpaper Settings",
+                                        )
+                                        .inner_size(
+                                            420.0,
+                                            600.0,
+                                        )
+                                        .resizable(true)
+                                        .center()
+                                        .build();
+                                }
+                            }
+
+                            "quit" => {
+                                std::process::exit(0);
+                            }
+
+                            _ => {}
                         }
-                    }
-                    "quit" => {
-                        std::process::exit(0);
-                    }
-                    _ => {},
-                })
+                    },
+                )
                 .build(app)?;
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .run(
+            tauri::generate_context!(),
+        )
+        .expect(
+            "error while running tauri application",
+        );
 }
 </file>
 
