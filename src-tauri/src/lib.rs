@@ -7,7 +7,6 @@ use tauri::{
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_store::StoreExt;
 use tauri_plugin_wallpaper::{AttachRequest, PinRequest, WallpaperExt};
-use tauri_plugin_dialog::init as dialog_init;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppSettings {
@@ -99,39 +98,46 @@ fn check_is_on_battery() -> bool {
     false
 }
 
-
+// Inter-process command: Persists an uploaded local file (image/video) to disk
+// under the app's data directory and returns its absolute path. Local files
+// picked in Settings used to be referenced via a `blob:` object URL, which is
+// only valid for the lifetime of the webview that created it - it silently
+// breaks the moment the app restarts. Writing the bytes to a real file on disk
+// (served back to the frontend through Tauri's asset protocol via
+// convertFileSrc) makes the wallpaper survive restarts, including via
+// autostart.
 #[tauri::command]
-fn save_wallpaper_file(
-    app: AppHandle,
-    source_path: String,
-) -> Result<String, String> {
-
+fn save_wallpaper_file(app: AppHandle, file_name: String, data: Vec<u8>) -> Result<String, String> {
     let base_dir = app
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?
         .join("wallpapers");
 
-    std::fs::create_dir_all(&base_dir)
-        .map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&base_dir).map_err(|e| e.to_string())?;
 
+    // Strip path separators / traversal attempts from the original file name
+    let safe_name = file_name.replace(['/', '\\'], "_").replace("..", "_");
 
-    let source = std::path::Path::new(&source_path);
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
 
-    let filename = source
-        .file_name()
-        .ok_or("Invalid filename")?
-        .to_string_lossy();
+    let file_path = base_dir.join(format!("{}_{}", timestamp, safe_name));
+    std::fs::write(&file_path, data).map_err(|e| e.to_string())?;
 
+    // Remove previously saved wallpaper files so old uploads don't pile up on disk
+    if let Ok(entries) = std::fs::read_dir(&base_dir) {
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            if entry_path != file_path {
+                let _ = std::fs::remove_file(entry_path);
+            }
+        }
+    }
 
-    let destination = base_dir.join(filename.as_ref());
-
-
-    std::fs::copy(source, &destination)
-        .map_err(|e| e.to_string())?;
-
-
-    Ok(destination.to_string_lossy().to_string())
+    Ok(file_path.to_string_lossy().to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -142,6 +148,13 @@ pub fn run() {
     // icons and is frequently covered by other apps. Left unchecked, this is
     // why video wallpapers appear to "stop playing after some time". These
     // flags tell WebView2 not to apply that throttling.
+    //
+    // Trade-off: this also disables throttling when the window is covered by
+    // *other real application windows* (not just desktop icons), so it won't
+    // get the free CPU/GPU savings Chromium would otherwise give an occluded
+    // renderer in that case. The `pause_on_unfocus` setting is the intended
+    // substitute for that - worth confirming it actually fires for this
+    // window (see note in App.tsx).
     #[cfg(target_os = "windows")]
     std::env::set_var(
         "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
@@ -149,7 +162,6 @@ pub fn run() {
     );
 
     tauri::Builder::default()
-        .plugin(dialog_init())
         .plugin(tauri_plugin_wallpaper::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_autostart::init(
@@ -174,10 +186,12 @@ pub fn run() {
             // restarting - which detaches our window from behind the desktop
             // icons and makes the wallpaper appear to freeze or vanish. Re-attach
             // and re-pin on an interval so it keeps recovering on its own instead
-            // of staying broken until the app is manually restarted.
+            // of staying broken until the app is manually restarted. 60s instead
+            // of 30s - this is a recovery net, not something that needs to react
+            // within half a minute, and it halves the thread's wake-ups.
             let watchdog_handle = handle.clone();
             std::thread::spawn(move || loop {
-                std::thread::sleep(std::time::Duration::from_secs(30));
+                std::thread::sleep(std::time::Duration::from_secs(60));
                 let _ = watchdog_handle.wallpaper().attach(AttachRequest::new("main"));
                 let _ = watchdog_handle.wallpaper().pin(PinRequest::new("main"));
             });
