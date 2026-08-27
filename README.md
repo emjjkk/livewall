@@ -1,3 +1,6 @@
+
+<img width="80" height="80" alt="icon" src="https://github.com/user-attachments/assets/867e1331-de28-4a1e-88c5-97f384ca1f70" />
+
 # Livewall: Minimal live wallpaper and desktop widget engine for Windows 10/11
 
 The aim of Livewall is to provide the functionality for live wallpapers and desktop widgets while incurring as little resource usage (RAM, CPU) as possible. It runs in the background as a tray application and allows you to set files (.mp4, .mov, .gif, or any image file) or URLs as your wallpaper, and any URL as a desktop widget.
