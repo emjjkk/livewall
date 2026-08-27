@@ -213,28 +213,49 @@ export function WallpaperWindow({ settings }: WallpaperWindowProps) {
 					className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${isPaused ? "opacity-30" : "opacity-100"}`}
 				/>
 			) : (
-				<img src={settings.wallpaper_src} alt="Wallpaper" className="absolute inset-0 h-full w-full object-cover" />
+				<img
+					src={settings.wallpaper_src}
+					alt="Wallpaper"
+					className="absolute inset-0 h-full w-full object-cover"
+				/>
 			)}
 
 			{/* URL widgets */}
-			{settings.overlays.map((overlay) => (
-				<iframe
-					key={overlay.id}
-					ref={(element) => {
-						iframeRefs.current[overlay.id] = element;
-					}}
-					src={overlay.url}
-					title={`Wallpaper widget ${overlay.id}`}
-					className="absolute border-0"
-					style={{
-						left: `${overlay.x}%`,
-						top: `${overlay.y}%`,
-						width: `${overlay.width}px`,
-						height: `${overlay.height}px`,
-					}}
-					sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-				/>
-			))}
+			{settings.overlays.map((overlay) => {
+				const translateX =
+					overlay.x === 0
+						? "0%"
+						: overlay.x === 100
+							? "-100%"
+							: "-50%";
+
+				const translateY =
+					overlay.y === 0
+						? "0%"
+						: overlay.y === 100
+							? "-100%"
+							: "-50%";
+
+				return (
+					<iframe
+						key={overlay.id}
+						ref={(element) => {
+							iframeRefs.current[overlay.id] = element;
+						}}
+						src={overlay.url}
+						title={`Wallpaper widget ${overlay.id}`}
+						className="absolute border-0"
+						style={{
+							left: `${overlay.x}%`,
+							top: `${overlay.y}%`,
+							width: `${overlay.width}px`,
+							height: `${overlay.height}px`,
+							transform: `translate(${translateX}, ${translateY})`,
+						}}
+						sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+					/>
+				);
+			})}
 		</main>
 	);
 }
