@@ -5,6 +5,8 @@
 
 The aim of Livewall is to provide the functionality for live wallpapers and desktop widgets while incurring as little resource usage (RAM, CPU) as possible. It runs in the background as a tray application and allows you to set files (.mp4, .mov, .gif, or any image file) or URLs as your wallpaper, and any URL as a desktop widget.
 
+> to open the settings menu, right click on the tray icon in your taskbar
+
 ### Known issues
 
 - Uploading a video live wallpaper (.mp4 or .mov) may cause momentary unresponsiveness during the saving process
