@@ -13,6 +13,7 @@
     "windows": [
       {
         "title": "main",
+        "create": false,
         "fullscreen": true,
         "decorations": false,
         "resizable": false,
