@@ -21,7 +21,11 @@ serde_json = "1"
 tauri-plugin-wallpaper = "4.0.0"
 tauri-plugin-autostart = "2.5.1"
 tauri-plugin-store = "2.4.4"
+sysinfo = "0.32"
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+base64 = "0.22"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "winbase"] }
-windows = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Media_Control", "Storage_Streams"] }
+wmi = "0.13"

@@ -16,6 +16,19 @@ interface WallpaperWindowProps {
 	settings: AppSettings;
 }
 
+function getWidgetUrl(overlay: {
+    url: string;
+    id: string;
+}) {
+    try {
+        const url = new URL(overlay.url);
+        url.searchParams.set("widget_id", overlay.id);
+        return url.toString();
+    } catch {
+        return overlay.url;
+    }
+}
+
 export function WallpaperWindow({
 	settings,
 }: WallpaperWindowProps) {
@@ -505,7 +518,7 @@ export function WallpaperWindow({
 							ref={(element) => {
 								iframeRefs.current[overlay.id] = element;
 							}}
-							src={overlay.url}
+							src={getWidgetUrl(overlay)}
 							title={`Livewall widget ${overlay.id}`}
 							className="pointer-events-auto absolute border-0"
 							style={{

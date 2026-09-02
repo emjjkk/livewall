@@ -8,7 +8,11 @@ import {
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
-import type { AppSettings, WallpaperOverlay } from "../types/settings";
+import type {
+    AppSettings,
+    ForwardingScope,
+    WallpaperOverlay,
+} from "../types/settings";
 
 interface SettingsWindowProps {
     settings: AppSettings;
@@ -201,6 +205,9 @@ export function SettingsWindow({
             y: 0,
             width: 400,
             height: 200,
+            forwarding_enabled: false,
+            forwarding_url: "",
+            forwarding_scopes: [],
         };
 
         onUpdate({
@@ -277,8 +284,8 @@ export function SettingsWindow({
                 horizontal === "left"
                     ? 0
                     : horizontal === "center"
-                      ? 50
-                      : 100;
+                        ? 50
+                        : 100;
         }
 
         if (vertical) {
@@ -286,11 +293,24 @@ export function SettingsWindow({
                 vertical === "top"
                     ? 0
                     : vertical === "center"
-                      ? 50
-                      : 100;
+                        ? 50
+                        : 100;
         }
 
         updateOverlay(overlay.id, changes);
+    };
+
+    const toggleForwardingScope = (
+        overlay: WallpaperOverlay,
+        scope: ForwardingScope,
+    ) => {
+        const has = overlay.forwarding_scopes.includes(scope);
+
+        updateOverlay(overlay.id, {
+            forwarding_scopes: has
+                ? overlay.forwarding_scopes.filter((s) => s !== scope)
+                : [...overlay.forwarding_scopes, scope],
+        });
     };
 
     return (
@@ -343,6 +363,7 @@ export function SettingsWindow({
                             updateOverlay={updateOverlay}
                             removeOverlay={removeOverlay}
                             setOverlayPosition={setOverlayPosition}
+                            toggleForwardingScope={toggleForwardingScope}
                         />
                     )}
                 </div>
@@ -541,6 +562,7 @@ function WidgetsTab({
     updateOverlay,
     removeOverlay,
     setOverlayPosition,
+    toggleForwardingScope,
 }: {
     settings: AppSettings;
     overlayUrlInput: string;
@@ -559,6 +581,10 @@ function WidgetsTab({
         overlay: WallpaperOverlay,
         horizontal?: "left" | "center" | "right",
         vertical?: "top" | "center" | "bottom",
+    ) => void;
+    toggleForwardingScope: (
+        overlay: WallpaperOverlay,
+        scope: ForwardingScope,
     ) => void;
 }) {
     return (
@@ -610,9 +636,14 @@ function WidgetsTab({
                                                 }),
                                             )
                                         }
-                                        className="min-w-0 flex-1 truncate text-left font-mono text-[10px] text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
+                                        className="min-w-0 flex-1 truncate text-left font-mono text-[10px] font-bold text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
                                     >
                                         {getHostname(overlay.url)}
+                                        {overlay.forwarding_enabled && (
+                                            <span className="ml-1.5 text-neutral-400">
+                                                · forwarding
+                                            </span>
+                                        )}
                                     </button>
 
                                     <button
@@ -773,6 +804,96 @@ function WidgetsTab({
                                                     },
                                                 ]}
                                             />
+                                        </div>
+
+                                        <div className="space-y-2 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+                                            <ToggleRow
+                                                label="Forward data to a URL"
+                                                description="POST this widget's requested data as JSON every ~5s"
+                                                checked={
+                                                    overlay.forwarding_enabled
+                                                }
+                                                onChange={() =>
+                                                    updateOverlay(
+                                                        overlay.id,
+                                                        {
+                                                            forwarding_enabled:
+                                                                !overlay.forwarding_enabled,
+                                                        },
+                                                    )
+                                                }
+                                            />
+
+                                            {overlay.forwarding_enabled && (
+                                                <div className="space-y-2">
+                                                    <input
+                                                        type="url"
+                                                        placeholder="https://your-endpoint.example/data"
+                                                        value={
+                                                            overlay.forwarding_url
+                                                        }
+                                                        onChange={(e) =>
+                                                            updateOverlay(
+                                                                overlay.id,
+                                                                {
+                                                                    forwarding_url:
+                                                                        e
+                                                                            .target
+                                                                            .value,
+                                                                },
+                                                            )
+                                                        }
+                                                        className={
+                                                            inputClass
+                                                        }
+                                                    />
+
+                                                    <ToggleRow
+                                                        label="Hardware"
+                                                        description="CPU usage, RAM usage, approximate GPU usage"
+                                                        checked={overlay.forwarding_scopes.includes(
+                                                            "hardware",
+                                                        )}
+                                                        onChange={() =>
+                                                            toggleForwardingScope(
+                                                                overlay,
+                                                                "hardware",
+                                                            )
+                                                        }
+                                                    />
+
+                                                    <ToggleRow
+                                                        label="Media"
+                                                        description="Currently playing track/artist and playback state"
+                                                        checked={overlay.forwarding_scopes.includes("media")}
+                                                        onChange={() => toggleForwardingScope(overlay, "media")}
+                                                    />
+
+                                                    <ToggleRow
+                                                        label="Windows"
+                                                        description="Titles of all currently open windows"
+                                                        checked={overlay.forwarding_scopes.includes(
+                                                            "windows",
+                                                        )}
+                                                        onChange={() =>
+                                                            toggleForwardingScope(
+                                                                overlay,
+                                                                "windows",
+                                                            )
+                                                        }
+                                                    />
+
+                                                    <p className="text-[9px] text-neutral-400">
+                                                        Data is sent as-is
+                                                        to the URL above —
+                                                        only use endpoints
+                                                        you trust, since
+                                                        window titles can
+                                                        contain sensitive
+                                                        information.
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -1002,11 +1123,10 @@ function AlignmentButton({
         <button
             type="button"
             onClick={onClick}
-            className={`border-r border-neutral-200 px-2 py-1.5 text-[9px] transition-colors last:border-r-0 dark:border-neutral-800 ${
-                active
+            className={`border-r border-neutral-200 px-2 py-1.5 text-[9px] transition-colors last:border-r-0 dark:border-neutral-800 ${active
                     ? "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-white"
                     : "bg-white text-neutral-400 hover:bg-neutral-50 hover:text-neutral-700 dark:bg-neutral-950 dark:text-neutral-500 dark:hover:bg-neutral-900 dark:hover:text-neutral-200"
-            }`}
+                }`}
         >
             {children}
         </button>
@@ -1043,35 +1163,47 @@ function SettingRow({
 
 function ToggleRow({
     label,
+    description,
     checked,
     onChange,
 }: {
     label: string;
+    description?: string;
     checked: boolean;
     onChange: () => void;
 }) {
     return (
-        <SettingRow label={label}>
+        <div className="flex min-h-10 items-center justify-between gap-3">
+            <div className="pr-3">
+                <p className="text-[11px] text-neutral-700 dark:text-neutral-300">
+                    {label}
+                </p>
+
+                {description && (
+                    <p className="mt-0.5 text-[9px] text-neutral-400">
+                        {description}
+                    </p>
+                )}
+            </div>
+
             <button
                 type="button"
                 role="switch"
                 aria-checked={checked}
                 onClick={onChange}
-                className={`relative h-3.5 w-6 shrink-0 border transition-colors ${
-                    checked
+                className={`relative h-3.5 w-6 shrink-0 border transition-colors ${checked
                         ? "border-neutral-900 bg-neutral-900 dark:border-neutral-100 dark:bg-neutral-100"
                         : "border-neutral-300 bg-transparent dark:border-neutral-700"
-                }`}
+                    }`}
             >
                 <span
-                    className={`absolute top-0.5 h-2 w-2 transition-transform ${
-                        checked
+                    className={`absolute top-0.5 h-2 w-2 transition-transform ${checked
                             ? "translate-x-3 bg-white dark:bg-neutral-950"
                             : "translate-x-0.5 bg-neutral-400"
-                    }`}
+                        }`}
                 />
             </button>
-        </SettingRow>
+        </div>
     );
 }
 
@@ -1088,11 +1220,10 @@ function TabButton({
         <button
             type="button"
             onClick={onClick}
-            className={`relative px-2.5 py-2 text-[11px] transition-colors ${
-                active
+            className={`relative px-2.5 py-2 text-[11px] transition-colors ${active
                     ? "text-neutral-900 dark:text-white"
                     : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-            }`}
+                }`}
         >
             {children}
 
