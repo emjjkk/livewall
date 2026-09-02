@@ -8,7 +8,7 @@ Livewall runs as a tray application and lets you use an **image, video, or webpa
 
 > Right-click the tray icon to open Settings.
 
-## Table of Contents
+### Table of Contents
 
 * [Features](#features)
 * [Wallpapers](#wallpapers)
