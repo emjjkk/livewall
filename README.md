@@ -2,13 +2,30 @@
 
 # Livewall
 
-**A minimal live wallpaper and desktop widget engine for Windows 10/11.**
+**A lightweight live wallpaper and desktop widget engine for Windows 10/11.**
 
 Livewall runs as a tray application and lets you use an **image, video, or webpage as your desktop wallpaper**. You can also place arbitrary URLs on top of the wallpaper as interactive, resizable widgets.
 
-Widgets can be anything from clocks and system monitors to Spotify now-playing displays and custom web apps.
-
 > Right-click the tray icon to open Settings.
+
+## Table of Contents
+
+* [Features](#features)
+* [Wallpapers](#wallpapers)
+* [Widgets](#widgets)
+
+  * [`widget_id`](#widget_id)
+  * [Data forwarding](#data-forwarding)
+  * [Building a widget](#building-a-widget)
+* [Interactivity and navigation](#interactivity-and-navigation)
+* [Pause behavior](#pause-behavior)
+* [Settings](#settings)
+* [Architecture](#architecture)
+* [Development](#development)
+* [Contributing](#contributing)
+* [Known issues](#known-issues)
+* [License](#license)
+
 
 ## Features
 
@@ -40,12 +57,6 @@ URLs are detected automatically by extension. Anything that isn't recognized as 
 
 Webpage wallpapers intentionally don't receive pointer input, so clicking the desktop doesn't accidentally interact with the wallpaper.
 
-### Wallpaper resources
-
-* [earth-is-beautiful.vercel.app](https://earth-is-beautiful.vercel.app/) — Random Wikimedia Commons locations as live wallpapers.
-
-Have a good one? Open a PR and add it.
-
 ## Widgets
 
 A widget is a URL rendered as an interactive `<iframe>` above the wallpaper.
@@ -60,7 +71,7 @@ Widgets support:
 * Mouse and keyboard input
 * Custom query parameters
 
-### Positioning
+#### Positioning
 
 Widgets use percentage-based center anchors:
 
@@ -138,7 +149,7 @@ widget_id = aaa-111            widget_id = bbb-222
              keyed by widget_id
 ```
 
-### Important properties
+#### Important properties
 
 * `widget_id` is a random UUID, not an authentication token.
 * It isn't tied to a user, machine, or account.
@@ -164,7 +175,7 @@ Scopes requested by multiple widgets are collected once per tick and reused acro
 
 Requests have a **4-second timeout** and run independently, so a slow endpoint won't block other widgets. Failed requests are logged and dropped without retries.
 
-### Payload
+#### Payload
 
 Every payload contains:
 
@@ -177,7 +188,7 @@ Every payload contains:
 
 Requested scopes are added as top-level fields.
 
-### `hardware`
+#### `hardware`
 
 Provides approximate system resource usage:
 
@@ -196,7 +207,7 @@ CPU and memory are collected using `sysinfo`. GPU usage is a Windows-only approx
 
 `gpu_usage_percent` may be `null` when unavailable.
 
-### `media`
+#### `media`
 
 Uses Windows System Media Transport Controls:
 
@@ -217,7 +228,7 @@ Spotify is preferred when multiple media sessions are available.
 
 Artwork is returned as a base64 data URI and capped at 10 MB.
 
-### `windows`
+#### `windows`
 
 Returns titles of currently visible top-level windows:
 
@@ -233,7 +244,7 @@ Returns titles of currently visible top-level windows:
 
 **Window titles may contain sensitive information**, including document names, email subjects, or page titles. Only forward this scope to an endpoint you control or trust.
 
-### Forwarding security
+#### Forwarding security
 
 Livewall does not authenticate or validate forwarding endpoints. Data is sent exactly as configured.
 
@@ -250,7 +261,7 @@ A Livewall widget is simply a webpage. No SDK or special runtime is required.
 
 There are two basic types.
 
-### Static widget
+#### Static widget
 
 If your widget doesn't need PC data, simply host a webpage and add its URL to Livewall.
 
@@ -263,7 +274,7 @@ Examples include:
 
 `widget_id` can safely be ignored.
 
-### Data-powered widget
+#### Data-powered widget
 
 If your widget needs forwarded data, the typical architecture is:
 
@@ -350,7 +361,7 @@ Fullscreen occlusion is always monitored because it provides the main performanc
 
 When the state changes, Livewall sends:
 
-### Widgets
+#### Widgets
 
 ```js
 window.postMessage({
@@ -359,7 +370,7 @@ window.postMessage({
 });
 ```
 
-### Wallpaper webpage
+#### Wallpaper webpage
 
 ```js
 window.postMessage({
@@ -444,7 +455,7 @@ src-tauri/
 └── tauri.conf.json
 ```
 
-### React handles
+#### React handles
 
 * Settings UI
 * Wallpaper rendering
@@ -452,7 +463,7 @@ src-tauri/
 * Widget iframes
 * Local UI state
 
-### Rust handles
+#### Rust handles
 
 * Persistent settings
 * Native file operations
@@ -467,14 +478,14 @@ The wallpaper window is attached to the Windows desktop through `tauri-plugin-wa
 
 ## Development
 
-### Requirements
+#### Requirements
 
 * Node.js + npm
 * Rust + Cargo
 * Tauri 2 prerequisites
 * WebView2 on Windows
 
-### Setup
+#### Setup
 
 ```bash
 git clone https://github.com/emjjkk/livewall.git
@@ -489,7 +500,7 @@ Vite runs on:
 http://localhost:1420
 ```
 
-### Commands
+#### Commands
 
 ```bash
 npm run tauri dev       # Development
@@ -519,7 +530,7 @@ Large file operations should remain native whenever possible rather than passing
 * Saving large video wallpapers may briefly make the application unresponsive.
 * Pause-on-unfocus can occasionally trigger when Livewall isn't actually unfocused.
 
-### Approximate resource usage
+#### Approximate resource usage
 
 With a 15-second MP4 wallpaper:
 
@@ -529,6 +540,29 @@ CPU:  ~0.5–3%
 ```
 
 Measured approximately on an Intel Core i3 system; actual usage varies with wallpaper, resolution, widgets, and hardware.
+
+## Contributing
+
+Contributions are welcome! Bug fixes, features, performance improvements, UI changes, documentation, and other improvements are all appreciated.
+
+Before submitting a pull request:
+
+1. Fork the repository and create a branch for your change.
+2. Make your changes in the appropriate `src/` or `src-tauri/` area.
+3. Run the relevant checks:
+
+   ```bash
+   npm run build
+   npm run format:check
+   npm run lint
+   npm run check
+   ```
+4. Test the application with `npm run tauri dev` on Windows.
+5. Keep pull requests focused and update the documentation when changing user-facing behavior.
+
+For larger features or architectural changes, opening an issue first is recommended so the approach can be discussed before implementation.
+
+When reporting a bug, include the Windows version, Livewall version or commit, reproduction steps, and any relevant logs or screenshots.
 
 ## License
 
