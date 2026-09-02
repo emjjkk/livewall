@@ -21,11 +21,13 @@ The aim of Livewall is to provide the functionality for live wallpapers and desk
 
 ## Resources
 
-Here's a list of URLs you can use as your live wallpaper or widget source. If you found/created more, please open a PR and add it! It would be greatly appreciated.
+
 
 <details>
-### <summary>Wallpapers</summary>
+<summary>Wallpapers</summary>
  
+- [https://earth-is-beautiful.vercel.app](https://earth-is-beautiful.vercel.app/) - An image of a random place in the world each time you start your computer, powered by WikiCommons
+
 
 
 </details>
@@ -33,6 +35,9 @@ Here's a list of URLs you can use as your live wallpaper or widget source. If yo
 
 <details>
 <summary>Widgets</summary>
+
+- [Live clock](https://github.com/emjjkk/clock) (e.g. `https://clock-overlay.vercel.app/?type=digital&format=12h&show_date=true`) - Live clock and weather on your desktop
+- Spotify embeds (e.g. `https://open.spotify.com/embed/track/0ZeGfEAL5Rl4pd5LZBGuEK?utm_source=generator&si=87a8634c09ee4df4`) - Embed a track or playlist on your desktop
 
 </details>
 
