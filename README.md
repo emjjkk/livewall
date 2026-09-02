@@ -12,17 +12,17 @@ Widgets can be anything from clocks and system monitors to Spotify now-playing d
 
 ## Features
 
-* 🖼️ Image, video, and webpage wallpapers
-* 🌐 Arbitrary webpage widgets
-* 🖱️ Interactive widgets with mouse and keyboard input
-* 📐 Custom widget positioning and sizing
-* 📡 Optional PC data forwarding to widget backends
-* 🎵 Windows media session integration
-* 💻 CPU, RAM, GPU, and window information
-* 🔋 Pause on battery
-* 💤 Pause when unfocused or occluded
-* 🚀 Windows autostart
-* 🪶 Lightweight Tauri + Rust architecture
+* Image, video, and webpage wallpapers
+* Arbitrary webpage widgets
+* Interactive widgets with mouse and keyboard input
+* Custom widget positioning and sizing
+* Optional PC data forwarding to widget backends
+* Windows media session integration
+* CPU, RAM, GPU, and window information
+* Pause on battery
+* Pause when unfocused or occluded
+* Windows autostart
+* Lightweight Tauri + Rust architecture
 
 ## Wallpapers
 
