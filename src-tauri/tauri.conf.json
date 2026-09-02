@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Livewall",
-  "version": "0.1.0",
-  "identifier": "com.os.livewall",
+  "version": "1.2.0",
+  "identifier": "com.emjjkk.livewall",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
