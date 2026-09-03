@@ -1,4 +1,4 @@
-<img width="80" height="80" alt="icon" src="https://github.com/user-attachments/assets/867e1331-de28-4a1e-88c5-97f384ca1f70" />
+<!--<img width="80" height="80" alt="icon" src="https://github.com/user-attachments/assets/867e1331-de28-4a1e-88c5-97f384ca1f70" />-->
 
 # Livewall
 
