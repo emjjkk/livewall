@@ -1,4 +1,4 @@
-<!--<img width="80" height="80" alt="icon" src="https://github.com/user-attachments/assets/867e1331-de28-4a1e-88c5-97f384ca1f70" />-->
+<img width="100" height="100" alt="icon" src="https://github.com/user-attachments/assets/867e1331-de28-4a1e-88c5-97f384ca1f70" />
 
 # Livewall
 
@@ -6,28 +6,24 @@
 
 Livewall runs as a tray application and lets you use an **image, video, or webpage as your desktop wallpaper**. You can also place arbitrary URLs on top of the wallpaper as interactive, resizable widgets.
 
-> Right-click the tray icon to open Settings.
-
-<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/2026a2cb-b039-4ec8-8276-a4bb288eb125" />
+> Right-click the tray icon to open Settings
 
 ### Table of Contents
 
-* [Features](#features)
-* [Wallpapers](#wallpapers)
-* [Widgets](#widgets)
-
-  * [`widget_id`](#widget_id)
-  * [Data forwarding](#data-forwarding)
-  * [Building a widget](#building-a-widget)
-* [Interactivity and navigation](#interactivity-and-navigation)
-* [Pause behavior](#pause-behavior)
-* [Settings](#settings)
-* [Architecture](#architecture)
-* [Development](#development)
-* [Contributing](#contributing)
-* [Known issues](#known-issues)
-* [License](#license)
-
+- [Features](#features)
+- [Wallpapers](#wallpapers)
+- [Widgets](#widgets)
+  - [widget_id](#widget_id)
+  - [Data forwarding](#data-forwarding)
+  - [Building a widget](#building-a-widget)
+- [Interactivity and navigation](#interactivity-and-navigation)
+- [Pause behavior](#pause-behavior)
+- [Settings](#settings)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Contributing](#contributing)
+- [Known issues](#known-issues)
+- [License](#license)
 
 ## Features
 
